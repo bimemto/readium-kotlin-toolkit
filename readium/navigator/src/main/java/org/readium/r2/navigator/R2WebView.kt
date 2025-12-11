@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.BuildConfig.DEBUG
+import org.readium.r2.shared.InternalReadiumApi
 import timber.log.Timber
 
 /**
@@ -64,6 +65,18 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                 }
             }
         }
+    }
+
+    @OptIn(InternalReadiumApi::class)
+    private fun scrollDown() {
+        Timber.d("scrollDown: Calling listener goToNextResource")
+        listener?.goToNextResource(jump = true, animated = true)
+    }
+
+    @OptIn(InternalReadiumApi::class)
+    private fun scrollUp() {
+        Timber.d("scrollUp: Calling listener goToPreviousResource")
+        listener?.goToPreviousResource(jump = true, animated = true)
     }
 
     private val MAX_SETTLE_DURATION = 600 // ms
@@ -117,6 +130,7 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
     private var mInitialMotionX: Float = 0.toFloat()
     private var mInitialMotionY: Float = 0.toFloat()
     private var mInitialOverscroll: OverscrollMode = OverscrollMode.NONE
+    private var mInitialVerticalOverscroll: VerticalOverscrollMode = VerticalOverscrollMode.NONE
 
     /**
      * Sentinel value for no current active pointer.
@@ -709,6 +723,8 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                 mLastMotionX = mInitialMotionX
                 mInitialMotionY = ev.y
                 mInitialOverscroll = getOverscrollMode()
+                mInitialVerticalOverscroll = getVerticalOverscrollMode()
+
                 mActivePointerId = ev.getPointerId(0)
             }
             MotionEvent.ACTION_MOVE -> {
@@ -745,18 +761,21 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val y = ev.safeGetY(activePointerIndex)
 
                     if (scrollMode) {
-                        val totalDelta = (y - mInitialMotionY).toInt()
-                        if (abs(totalDelta) < 200) {
-                            if (mInitialOverscroll == OverscrollMode.BOTH) {
-                                if (mInitialMotionX < x) {
-                                    scrollLeft(animated = true)
-                                } else if (mInitialMotionX > x) {
-                                    scrollRight(animated = true)
+                        val totalHorizontalDelta = (x - mInitialMotionX).toInt()
+
+                        // Vertical swipe for chapter navigation in scroll mode
+                        // Only trigger vertical navigation if horizontal movement is small
+                        if (abs(totalHorizontalDelta) < 300) {
+                            if (mInitialVerticalOverscroll == VerticalOverscrollMode.BOTH) {
+                                if (mInitialMotionY < y) {
+                                    scrollUp()
+                                } else if (mInitialMotionY > y) {
+                                    scrollDown()
                                 }
-                            } else if (mInitialMotionX < x && mInitialOverscroll == OverscrollMode.LEFT) {
-                                scrollLeft(animated = true)
-                            } else if (mInitialMotionX > x && mInitialOverscroll == OverscrollMode.RIGHT) {
-                                scrollRight(animated = true)
+                            } else if (mInitialMotionY < y && mInitialVerticalOverscroll == VerticalOverscrollMode.TOP) {
+                                scrollUp()
+                            } else if (mInitialMotionY > y && mInitialVerticalOverscroll == VerticalOverscrollMode.BOTTOM) {
+                                scrollDown()
                             }
                         }
                     } else {
@@ -1077,6 +1096,25 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         }
     }
 
+    private fun getVerticalOverscrollMode(): VerticalOverscrollMode {
+        if (!scrollMode) {
+            return VerticalOverscrollMode.NONE
+        }
+
+        val atTop = scrollY <= 0
+        val atBottom = !canScrollVertically(1)
+
+        if (atTop && atBottom) {
+            return VerticalOverscrollMode.BOTH
+        } else if (atTop) {
+            return VerticalOverscrollMode.TOP
+        } else if (atBottom) {
+            return VerticalOverscrollMode.BOTTOM
+        } else {
+            return VerticalOverscrollMode.NONE
+        }
+    }
+
     internal val numPages: Int get() =
         getClientWidth()
             ?.let { clientWidth -> (computeHorizontalScrollRange() / clientWidth.toDouble()).roundToInt() }
@@ -1087,6 +1125,13 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         NONE,
         LEFT,
         RIGHT,
+        BOTH,
+    }
+
+    enum class VerticalOverscrollMode {
+        NONE,
+        TOP,
+        BOTTOM,
         BOTH,
     }
 

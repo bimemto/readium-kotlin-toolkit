@@ -12,6 +12,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.os.Bundle
 import android.util.LayoutDirection
+import android.util.Log
 import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.View
@@ -28,6 +29,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentFactory
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.withStarted
@@ -38,6 +40,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -95,6 +98,7 @@ import org.readium.r2.shared.util.Url
 import org.readium.r2.shared.util.mediatype.MediaType
 import org.readium.r2.shared.util.resource.Resource
 import org.readium.r2.shared.util.toAbsoluteUrl
+import timber.log.Timber
 
 /**
  * Factory for a [JavascriptInterface] which will be injected in the web views.
@@ -344,6 +348,7 @@ public class EpubNavigatorFragment internal constructor(
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
+        Log.d("FACK", "CCC")
         currentActivity = requireActivity()
         _binding = ReadiumNavigatorViewpagerBinding.inflate(inflater, container, false)
         var view: View = binding.root
@@ -438,6 +443,26 @@ public class EpubNavigatorFragment internal constructor(
         // Let the page views handle the keyboard events.
         resourcePager.isFocusable = false
         resourcePager.addOnPageChangeListener(PageChangeListener())
+
+        // Set initial scroll mode flag and orientation
+        val isScrollEnabled = viewModel.isScrollEnabled.value
+        //resourcePager.isScrollModeEnabled = isScrollEnabled
+
+        // Set ViewPager orientation based on scroll mode
+        // Scroll mode (vertical scrolling within chapter) = vertical orientation for chapter navigation
+        // Paginated mode (horizontal paging within chapter) = horizontal orientation for chapter navigation
+        resourcePager.setHorizontal(!isScrollEnabled)
+
+        // Observe scroll mode changes and update flag + orientation
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isScrollEnabled
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle)
+                .collectLatest { scrollEnabled ->
+                    //resourcePager.isScrollModeEnabled = scrollEnabled
+                    resourcePager.setHorizontal(!scrollEnabled)
+                    Timber.d("ViewPager scroll mode: $scrollEnabled, horizontal: ${!scrollEnabled}")
+                }
+        }
 
         parent.addView(resourcePager)
 
@@ -865,6 +890,38 @@ public class EpubNavigatorFragment internal constructor(
         override fun resourceAtUrl(url: Url): Resource? =
             viewModel.internalLinkFromUrl(url)
                 ?.let { publication.get(it) }
+
+        // override fun onVerticalOverscrollBottom() {
+        //     // Triggered when user scrolls past bottom edge in scroll mode
+        //     // Debouncing is handled in R2EpubPageFragment, so we can trigger immediately
+        //     Timber.d("🔽 onVerticalOverscrollBottom - navigating to next chapter")
+        //     viewLifecycleOwner.lifecycleScope.launch {
+        //         if (goToNextResource(jump = true, animated = true)) {
+        //             Timber.d("🔽 Successfully navigated to next chapter")
+        //             // Wait briefly for page to load, then scroll to top
+        //             delay(50)
+        //             currentReflowablePageFragment?.webView?.scrollToStart()
+        //         } else {
+        //             Timber.d("🔽 Already at last chapter")
+        //         }
+        //     }
+        // }
+
+        // override fun onVerticalOverscrollTop() {
+        //     // Triggered when user scrolls past top edge in scroll mode
+        //     // Debouncing is handled in R2EpubPageFragment, so we can trigger immediately
+        //     Timber.d("🔼 onVerticalOverscrollTop - navigating to previous chapter")
+        //     viewLifecycleOwner.lifecycleScope.launch {
+        //         if (goToPreviousResource(jump = true, animated = true)) {
+        //             Timber.d("🔼 Successfully navigated to previous chapter")
+        //             // Wait briefly for page to load, then scroll to bottom
+        //             delay(50)
+        //             currentReflowablePageFragment?.webView?.scrollToEnd()
+        //         } else {
+        //             Timber.d("🔼 Already at first chapter")
+        //         }
+        //     }
+        // }
     }
 
     override fun goForward(animated: Boolean): Boolean {

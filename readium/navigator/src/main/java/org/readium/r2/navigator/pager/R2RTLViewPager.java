@@ -29,6 +29,7 @@ import androidx.core.os.ParcelableCompatCreatorCallbacks;
 import androidx.core.view.ViewCompat;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager.widget.DirectionalViewPager;
 
 import org.readium.r2.navigator.preferences.ReadingProgression;
 import org.readium.r2.shared.InternalReadiumApi;
@@ -46,10 +47,10 @@ import java.util.HashMap;
  * modifications are kept internal to <code>RtlViewPager</code>.
  */
 @InternalReadiumApi
-public class R2RTLViewPager extends ViewPager {
+public class R2RTLViewPager extends DirectionalViewPager {
     public ReadingProgression direction = ReadingProgression.LTR;
     private int mLayoutDirection = ViewCompat.LAYOUT_DIRECTION_LTR;
-    private HashMap<OnPageChangeListener, ReversingOnPageChangeListener> mPageChangeListeners = new HashMap<>();
+    private HashMap<ViewPager.OnPageChangeListener, ReversingOnPageChangeListener> mPageChangeListeners = new HashMap<>();
 
     public R2RTLViewPager(Context context) {
         super(context);
@@ -192,14 +193,14 @@ public class R2RTLViewPager extends ViewPager {
     }
 
     @Override
-    public void addOnPageChangeListener(OnPageChangeListener listener) {
+    public void addOnPageChangeListener(ViewPager.OnPageChangeListener listener) {
         ReversingOnPageChangeListener reversingListener = new ReversingOnPageChangeListener(listener);
         mPageChangeListeners.put(listener, reversingListener);
         super.addOnPageChangeListener(reversingListener);
     }
 
     @Override
-    public void removeOnPageChangeListener(OnPageChangeListener listener) {
+    public void removeOnPageChangeListener(ViewPager.OnPageChangeListener listener) {
         ReversingOnPageChangeListener reverseListener = mPageChangeListeners.remove(listener);
         if (reverseListener != null) {
             super.removeOnPageChangeListener(reverseListener);
@@ -229,10 +230,10 @@ public class R2RTLViewPager extends ViewPager {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
-    private class ReversingOnPageChangeListener implements OnPageChangeListener {
-        private final OnPageChangeListener mListener;
+    private class ReversingOnPageChangeListener implements ViewPager.OnPageChangeListener {
+        private final ViewPager.OnPageChangeListener mListener;
 
-        public ReversingOnPageChangeListener(OnPageChangeListener listener) {
+        public ReversingOnPageChangeListener(ViewPager.OnPageChangeListener listener) {
             mListener = listener;
         }
 

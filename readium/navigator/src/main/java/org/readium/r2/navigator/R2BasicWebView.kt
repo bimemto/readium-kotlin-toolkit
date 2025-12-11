@@ -105,6 +105,20 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
 
         @InternalReadiumApi
         fun goToPreviousResource(jump: Boolean, animated: Boolean): Boolean = false
+
+        /**
+         * Called when user overscrolls vertically at the bottom in scroll mode.
+         * Typically used to navigate to the next chapter.
+         */
+        @InternalReadiumApi
+        fun onVerticalOverscrollBottom() {}
+
+        /**
+         * Called when user overscrolls vertically at the top in scroll mode.
+         * Typically used to navigate to the previous chapter.
+         */
+        @InternalReadiumApi
+        fun onVerticalOverscrollTop() {}
     }
 
     var listener: Listener? = null
