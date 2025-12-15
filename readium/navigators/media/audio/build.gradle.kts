@@ -14,6 +14,10 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -24,4 +28,5 @@ dependencies {
 
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines.android)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

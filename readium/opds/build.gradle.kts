@@ -10,6 +10,10 @@ plugins {
 
 android {
     namespace = "org.readium.r2.opds"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -21,4 +25,6 @@ dependencies {
     // Tests
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

@@ -18,6 +18,10 @@ android {
 
     kotlinOptions {
     }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 kotlin {
@@ -54,4 +58,6 @@ dependencies {
     testImplementation(libs.kotlin.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

@@ -10,6 +10,10 @@ plugins {
 
 android {
     namespace = "org.readium.r2.streamer"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -28,4 +32,6 @@ dependencies {
     testImplementation(libs.kotlin.junit)
     testImplementation(libs.assertj)
     testImplementation(libs.robolectric)
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

@@ -10,8 +10,13 @@ plugins {
 
 android {
     namespace = "org.readium.adapter.exoplayer"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
     api(project(":readium:adapters:exoplayer:readium-adapter-exoplayer-audio"))
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }
