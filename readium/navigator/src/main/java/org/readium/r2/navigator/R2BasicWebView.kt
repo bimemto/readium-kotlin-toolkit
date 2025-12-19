@@ -14,6 +14,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Build
 import android.util.AttributeSet
+import android.util.Log
 import android.view.*
 import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
@@ -155,6 +156,7 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
                     // Currently, scrollX for page with vertical text starts at maxScrollX
                     progression = ((maxScrollX - x) / contentWidth).coerceIn(0.0, 1.0)
                 }
+                Log.d("R2BasicWebView", "::progression SCROLL_MODE_VERTICAL_TEXT: scrollX=$x, contentWidth=$contentWidth, viewportWidth=$viewportWidth, progression=$progression")
                 progression
             } else {
                 val y = scrollY.toDouble()
@@ -164,6 +166,7 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
                 if (contentHeight > 0) {
                     progression = (y / contentHeight).coerceIn(0.0, 1.0)
                 }
+                Log.d("R2BasicWebView", "::progression SCROLL_MODE: scrollY=$y, contentHeight=$contentHeight, progression=$progression")
                 progression
             }
         } else {
@@ -189,6 +192,7 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
                 progression = 1 - progression
             }
 
+            Log.d("R2BasicWebView", "::progression PAGINATED_MODE: scrollX=$x, pageWidth=$pageWidth, contentWidth=$contentWidth, isRtl=$isRtl, progression=$progression")
             progression
         }
     }

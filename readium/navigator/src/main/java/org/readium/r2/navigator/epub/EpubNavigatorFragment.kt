@@ -1127,6 +1127,8 @@ public class EpubNavigatorFragment internal constructor(
                 progression.coerceIn(0.0, 1.0)
             } ?: 0.0
 
+            Log.d("EpubNavigator", "::notifyCurrentLocation progression=$progression, mCurItem=${reflowableWebView?.mCurItem}, numPages=${reflowableWebView?.numPages}")
+
             val link = when (val pageResource = adapter.getResource(resourcePager.currentItem)) {
                 is PageResource.EpubFxl -> checkNotNull(
                     pageResource.leftLink ?: pageResource.rightLink
@@ -1151,10 +1153,13 @@ public class EpubNavigatorFragment internal constructor(
                 text = positionLocator?.text ?: Locator.Text()
             )
 
+            Log.d("EpubNavigator", "::notifyCurrentLocation CREATED LOCATOR: href=${currentLocator.href}, progression=${currentLocator.locations.progression}, totalProgression=${currentLocator.locations.totalProgression}")
+
             _currentLocator.value = currentLocator
 
             // Deprecated notifications
             reflowableWebView?.let {
+                Log.d("EpubNavigator", "::notifyCurrentLocation CALLING paginationListener.onPageChanged with progression=${currentLocator.locations.progression}")
                 paginationListener?.onPageChanged(
                     pageIndex = it.mCurItem,
                     totalPages = it.numPages,
