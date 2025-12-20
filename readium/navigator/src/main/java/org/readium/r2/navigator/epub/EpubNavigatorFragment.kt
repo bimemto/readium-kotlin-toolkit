@@ -348,7 +348,6 @@ public class EpubNavigatorFragment internal constructor(
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        Log.d("FACK", "CCC")
         currentActivity = requireActivity()
         _binding = ReadiumNavigatorViewpagerBinding.inflate(inflater, container, false)
         var view: View = binding.root

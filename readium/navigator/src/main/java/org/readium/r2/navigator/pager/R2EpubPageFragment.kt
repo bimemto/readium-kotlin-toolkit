@@ -180,71 +180,79 @@ internal class R2EpubPageFragment : Fragment() {
         var lastTopOverscrollTime = 0L
         val overscrollDebounceMs = 500L // Prevent multiple triggers within 500ms
 
-        webView.setOnOverScrolledCallback(object : R2BasicWebView.OnOverScrolledCallback {
-            override fun onOverScrolled(
-                scrollX: Int,
-                scrollY: Int,
-                clampedX: Boolean,
-                clampedY: Boolean,
-            ) {
-                activity ?: return
-                val metrics = DisplayMetrics()
-
-                val topDecile = webView.contentHeight - 1.15 * metrics.heightPixels
-                val bottomDecile = (webView.contentHeight - metrics.heightPixels).toDouble()
-
-                when (scrollY.toDouble()) {
-                    in topDecile..bottomDecile -> {
-                        if (!endReached) {
-                            endReached = true
-                            webView.listener?.onPageEnded(endReached)
-                        }
-                    }
-                    else -> {
-                        if (endReached) {
-                            endReached = false
-                            webView.listener?.onPageEnded(endReached)
-                        }
-                    }
-                }
-
-                // Only handle vertical chapter navigation in scroll mode
-                if (!webView.scrollMode) {
-                    return
-                }
-
-                val currentTime = System.currentTimeMillis()
-
-                // Simple edge detection similar to horizontal mode
-                // Trigger when user tries to scroll past the edge
-
-                // Detect at BOTTOM edge (for next chapter)
-                if (clampedY) {
-                    val canScrollDown = webView.canScrollVertically(1)
-                    if (!canScrollDown && scrollY > 0) {
-                        // At bottom edge - trigger next chapter navigation
-                        if (currentTime - lastBottomOverscrollTime > overscrollDebounceMs) {
-                            lastBottomOverscrollTime = currentTime
-                            Log.d("R2EpubPageFragment", "🔽 Bottom edge detected -> next chapter")
-                            webView.listener?.onVerticalOverscrollBottom()
-                        }
-                    }
-                }
-
-                // Detect at TOP edge (for previous chapter)
-                if (clampedY && scrollY <= 0) {
-                    val canScrollUp = webView.canScrollVertically(-1)
-                    if (!canScrollUp) {
-                        // At top edge - trigger previous chapter navigation
-                        if (currentTime - lastTopOverscrollTime > overscrollDebounceMs) {
-                            lastTopOverscrollTime = currentTime
-                            Log.d("R2EpubPageFragment", "🔼 Top edge detected -> previous chapter")
-                            webView.listener?.onVerticalOverscrollTop()
-                        }
-                    }
-                }
+        fun triggerBottomOverscroll() {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastBottomOverscrollTime > overscrollDebounceMs) {
+                lastBottomOverscrollTime = currentTime
+                Log.d("R2EpubPageFragment", "🔽 Bottom overscroll detected -> next chapter")
+                webView.listener?.onVerticalOverscrollBottom()
             }
-        })
+        }
+
+        fun triggerTopOverscroll() {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastTopOverscrollTime > overscrollDebounceMs) {
+                lastTopOverscrollTime = currentTime
+                Log.d("R2EpubPageFragment", "🔼 Top overscroll detected -> previous chapter")
+                webView.listener?.onVerticalOverscrollTop()
+            }
+        }
+
+        // webView.setOnOverScrolledCallback(object : R2BasicWebView.OnOverScrolledCallback {
+        //     override fun onOverScrolled(
+        //         scrollX: Int,
+        //         scrollY: Int,
+        //         clampedX: Boolean,
+        //         clampedY: Boolean,
+        //     ) {
+        //         activity ?: return
+        //         val metrics = DisplayMetrics()
+
+        //         val topDecile = webView.contentHeight - 1.15 * metrics.heightPixels
+        //         val bottomDecile = (webView.contentHeight - metrics.heightPixels).toDouble()
+
+        //         when (scrollY.toDouble()) {
+        //             in topDecile..bottomDecile -> {
+        //                 if (!endReached) {
+        //                     endReached = true
+        //                     webView.listener?.onPageEnded(endReached)
+        //                 }
+        //             }
+        //             else -> {
+        //                 if (endReached) {
+        //                     endReached = false
+        //                     webView.listener?.onPageEnded(endReached)
+        //                 }
+        //             }
+        //         }
+
+        //         // Only handle vertical chapter navigation in scroll mode
+        //         if (!webView.scrollMode) {
+        //             return
+        //         }
+
+        //         // Simple edge detection similar to horizontal mode
+        //         // Trigger when user tries to scroll past the edge
+
+        //         // Detect at BOTTOM edge (for next chapter)
+        //         if (clampedY) {
+        //             val canScrollDown = webView.canScrollVertically(1)
+        //             if (!canScrollDown && scrollY > 0) {
+        //                 // At bottom edge - trigger next chapter navigation
+        //                 triggerBottomOverscroll()
+        //             }
+        //         }
+
+        //         // Detect at TOP edge (for previous chapter)
+        //         if (clampedY && scrollY <= 0) {
+        //             val canScrollUp = webView.canScrollVertically(-1)
+        //             if (!canScrollUp) {
+        //                 // At top edge - trigger previous chapter navigation
+        //                 triggerTopOverscroll()
+        //             }
+        //         }
+        //     }
+        // })
 
         webView.webViewClient = object : WebViewClientCompat() {
 
