@@ -738,8 +738,10 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val pointerIndex = ev.findPointerIndex(mActivePointerId)
                     val x = ev.safeGetX(pointerIndex)
                     val xDiff = abs(x - mLastMotionX)
+                    val y = ev.safeGetY(pointerIndex)
+                    val yDiff = abs(y - mInitialMotionY)
 
-                    if (xDiff > mTouchSlop) {
+                    if (xDiff > mTouchSlop || (scrollMode && yDiff > mTouchSlop)) {
                         if (DEBUG) Timber.v("Starting drag!")
                         mIsBeingDragged = true
                         mLastMotionX = if (x - mInitialMotionX > 0) {
@@ -761,11 +763,11 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val y = ev.safeGetY(activePointerIndex)
 
                     if (scrollMode) {
-                        val totalHorizontalDelta = (x - mInitialMotionX).toInt()
+                        val totalVerticalDelta = (x - mInitialMotionX).toInt()
 
                         // Vertical swipe for chapter navigation in scroll mode
                         // Only trigger vertical navigation if horizontal movement is small
-                        if (abs(totalHorizontalDelta) < 300) {
+                        if (abs(totalVerticalDelta) < 300) {
                             if (mInitialVerticalOverscroll == VerticalOverscrollMode.BOTH) {
                                 if (mInitialMotionY < y) {
                                     scrollUp()

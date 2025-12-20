@@ -175,28 +175,28 @@ internal class R2EpubPageFragment : Fragment() {
         webView.setPadding(0, 0, 0, 0)
         webView.addJavascriptInterface(webView, "Android")
 
-        var endReached = false
-        var lastBottomOverscrollTime = 0L
-        var lastTopOverscrollTime = 0L
-        val overscrollDebounceMs = 500L // Prevent multiple triggers within 500ms
+        // var endReached = false
+        // var lastBottomOverscrollTime = 0L
+        // var lastTopOverscrollTime = 0L
+        // val overscrollDebounceMs = 500L // Prevent multiple triggers within 500ms
 
-        fun triggerBottomOverscroll() {
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastBottomOverscrollTime > overscrollDebounceMs) {
-                lastBottomOverscrollTime = currentTime
-                Log.d("R2EpubPageFragment", "🔽 Bottom overscroll detected -> next chapter")
-                webView.listener?.onVerticalOverscrollBottom()
-            }
-        }
+        // fun triggerBottomOverscroll() {
+        //     val currentTime = System.currentTimeMillis()
+        //     if (currentTime - lastBottomOverscrollTime > overscrollDebounceMs) {
+        //         lastBottomOverscrollTime = currentTime
+        //         Log.d("R2EpubPageFragment", "🔽 Bottom overscroll detected -> next chapter")
+        //         webView.listener?.onVerticalOverscrollBottom()
+        //     }
+        // }
 
-        fun triggerTopOverscroll() {
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastTopOverscrollTime > overscrollDebounceMs) {
-                lastTopOverscrollTime = currentTime
-                Log.d("R2EpubPageFragment", "🔼 Top overscroll detected -> previous chapter")
-                webView.listener?.onVerticalOverscrollTop()
-            }
-        }
+        // fun triggerTopOverscroll() {
+        //     val currentTime = System.currentTimeMillis()
+        //     if (currentTime - lastTopOverscrollTime > overscrollDebounceMs) {
+        //         lastTopOverscrollTime = currentTime
+        //         Log.d("R2EpubPageFragment", "🔼 Top overscroll detected -> previous chapter")
+        //         webView.listener?.onVerticalOverscrollTop()
+        //     }
+        // }
 
         // webView.setOnOverScrolledCallback(object : R2BasicWebView.OnOverScrolledCallback {
         //     override fun onOverScrolled(
