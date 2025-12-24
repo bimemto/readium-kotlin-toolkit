@@ -35,6 +35,7 @@ import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.epub.pageList
+import org.readium.r2.testapp.ALEGREYA
 import org.readium.r2.testapp.LITERATA
 import org.readium.r2.testapp.R
 import org.readium.r2.testapp.reader.preferences.UserPreferencesViewModel
@@ -106,6 +107,15 @@ class EpubReaderFragment : VisualReaderFragment() {
                         addFontFace {
                             addSource("fonts/Literata-Italic-VariableFont_opsz,wght.ttf")
                             setFontStyle(FontStyle.ITALIC)
+                            setFontWeight(200..900)
+                        }
+                    }
+
+                    addFontFamilyDeclaration(FontFamily.ALEGREYA) {
+                        addFontFace {
+                            addSource("fonts/Alegreya-VariableFont_wght.ttf")
+                            setFontStyle(FontStyle.NORMAL)
+                            // Literata is a variable font family, so we can provide a font weight range.
                             setFontWeight(200..900)
                         }
                     }

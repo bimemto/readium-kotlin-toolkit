@@ -73,3 +73,6 @@ class Readium(context: Context) {
 
 @OptIn(ExperimentalReadiumApi::class)
 val FontFamily.Companion.LITERATA: FontFamily get() = FontFamily("Literata")
+
+@OptIn(ExperimentalReadiumApi::class)
+val FontFamily.Companion.ALEGREYA: FontFamily get() = FontFamily("Alegreya")

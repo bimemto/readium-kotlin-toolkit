@@ -27,6 +27,7 @@ import org.readium.r2.navigator.preferences.TextAlign as ReadiumTextAlign
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.epub.EpubLayout
 import org.readium.r2.shared.util.Language
+import org.readium.r2.testapp.ALEGREYA
 import org.readium.r2.testapp.LITERATA
 import org.readium.r2.testapp.R
 import org.readium.r2.testapp.reader.ReaderViewModel
@@ -461,6 +462,7 @@ private fun ReflowableUserPreferences(
                     .withSupportedValues(
                         null,
                         FontFamily.LITERATA,
+                        FontFamily.ALEGREYA,
                         FontFamily.SANS_SERIF,
                         FontFamily.IA_WRITER_DUOSPACE,
                         FontFamily.ACCESSIBLE_DFA,

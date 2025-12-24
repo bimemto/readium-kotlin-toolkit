@@ -370,8 +370,10 @@ public class EpubPreferencesEditor internal constructor(
             updateValue = { value -> updateValues { it.copy(textAlign = value) } },
             supportedValues = listOf(
                 TextAlign.START,
+                TextAlign.END,
                 TextAlign.LEFT,
                 TextAlign.RIGHT,
+                TextAlign.CENTER,
                 TextAlign.JUSTIFY
             )
         )

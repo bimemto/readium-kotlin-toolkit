@@ -508,6 +508,8 @@ public enum class TextAlign(private val css: String) : Cssable {
     LEFT("left"),
     RIGHT("right"),
     JUSTIFY("justify"),
+    CENTER("center"),
+    END("end"),
     ;
 
     override fun toCss(): String? = css

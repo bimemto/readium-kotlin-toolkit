@@ -6,6 +6,7 @@
 
 package org.readium.r2.navigator.epub
 
+import android.util.Log
 import org.readium.r2.navigator.epub.css.Appearance
 import org.readium.r2.navigator.epub.css.ColCount
 import org.readium.r2.navigator.epub.css.Color as CssColor
@@ -67,7 +68,6 @@ public data class EpubSettings @ExperimentalReadiumApi constructor(
 internal fun ReadiumCss.update(settings: EpubSettings, useReadiumCssFontSize: Boolean): ReadiumCss {
     fun resolveFontStack(fontFamily: String): List<String> = buildList {
         add(fontFamily)
-
         val alternates = fontFamilyDeclarations
             .firstOrNull { it.fontFamily == fontFamily }
             ?.alternates
@@ -118,7 +118,9 @@ internal fun ReadiumCss.update(settings: EpubSettings, useReadiumCssFontSize: Bo
                     TextAlign.JUSTIFY -> CssTextAlign.JUSTIFY
                     TextAlign.LEFT -> CssTextAlign.LEFT
                     TextAlign.RIGHT -> CssTextAlign.RIGHT
-                    TextAlign.START, TextAlign.CENTER, TextAlign.END -> CssTextAlign.START
+                    TextAlign.START -> CssTextAlign.START
+                    TextAlign.CENTER -> CssTextAlign.CENTER
+                    TextAlign.END -> CssTextAlign.END
                     null -> null
                 },
                 lineHeight = lineHeight?.let { Either(it) },

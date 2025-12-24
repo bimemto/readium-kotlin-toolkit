@@ -6,6 +6,7 @@
 
 package org.readium.r2.navigator.epub.css
 
+import android.util.Log
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.util.Either
 import org.readium.r2.shared.util.Url
@@ -62,7 +63,6 @@ internal data class FontFaceDeclaration(
             val urls = sources.map { urlNormalizer(it.href) }
             val src = urls.joinToString(", ") { """url("$it")""" }
             set("src", src)
-
             fontStyle?.let { set("font-style", it.name.lowercase()) }
 
             fontWeight?.let {
@@ -147,6 +147,7 @@ public data class MutableFontFaceDeclaration internal constructor(
      * using `<link rel="preload">`.
      */
     public fun addSource(href: Url, preload: Boolean = false) {
+        Log.d("FACK", "add source: $href")
         this.sources.add(FontFaceSource(href = href, preload = preload))
     }
 
