@@ -184,7 +184,8 @@ public class StringSearchService(
             return resourceLocator.copy(
                 locations = resourceLocator.locations.copy(
                     progression = progression,
-                    totalProgression = totalProgression
+                    totalProgression = totalProgression,
+                    position = resourceIndex + 1
                 ),
                 text = createSnippet(text, range)
             )

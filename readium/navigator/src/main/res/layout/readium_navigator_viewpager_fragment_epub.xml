@@ -11,23 +11,9 @@
     android:focusable="false"
     android:orientation="vertical">
 
-    <FrameLayout
+    <org.readium.r2.navigator.R2WebView
+        android:id="@+id/webView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-<!--        <androidx.appcompat.widget.AppCompatImageView-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="match_parent"-->
-<!--            android:id="@+id/reading_bg"-->
-<!--            android:src="@drawable/bg_reading"-->
-<!--            android:scaleType="centerCrop"-->
-<!--            android:adjustViewBounds="true"/>-->
-
-        <org.readium.r2.navigator.R2WebView
-            android:id="@+id/webView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
-
-    </FrameLayout>
+        android:layout_height="match_parent"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
