@@ -433,6 +433,7 @@ public class EpubNavigatorFragment internal constructor(
         parent.removeView(resourcePager)
 
         resourcePager = R2ViewPager(requireContext())
+        resourcePager.offscreenPageLimit = 3
         resourcePager.id = R.id.resourcePager
         resourcePager.publicationType = when (publication.metadata.presentation.layout) {
             EpubLayout.REFLOWABLE, null -> R2ViewPager.PublicationType.EPUB
@@ -995,6 +996,7 @@ public class EpubNavigatorFragment internal constructor(
             if (settings.value.readingProgression == ReadingProgression.RTL) {
                 webView.setCurrentItem(0, false)
             } else {
+                Log.d("EpubNavigator", "🔙 goToPreviousResource: Setting webView to last page: ${webView.numPages}")
                 webView.setCurrentItem(webView.numPages - 1, false)
             }
         }

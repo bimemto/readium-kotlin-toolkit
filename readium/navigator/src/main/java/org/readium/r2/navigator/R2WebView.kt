@@ -15,7 +15,15 @@ import android.content.Context
 import android.graphics.Rect
 import android.os.Build
 import android.util.AttributeSet
-import android.view.*
+import android.view.FocusFinder
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.SoundEffectConstants
+import android.view.VelocityTracker
+import android.view.View
+import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.animation.Interpolator
 import android.widget.EdgeEffect
 import android.widget.Scroller
@@ -23,7 +31,11 @@ import androidx.annotation.CallSuper
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -365,15 +377,18 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
     }
 
     private fun scrollToItem(item: Int, smoothScroll: Boolean, velocity: Int, post: Boolean) {
-        val width = getClientWidth() ?: return
+        if (!scrollMode) {
+            // Horizontal paging mode - giữ nguyên logic cũ
+            val width = getClientWidth() ?: return
 
-        val destX = (width * item)
-        if (smoothScroll) {
-            smoothScrollTo(destX, 0, velocity)
-        } else {
-            completeScroll(false)
-            scrollTo(destX, 0)
-            pageScrolled(destX)
+            val destX = (width * item)
+            if (smoothScroll) {
+                smoothScrollTo(destX, 0, velocity)
+            } else {
+                completeScroll(false)
+                scrollTo(destX, 0)
+                pageScrolled(destX)
+            }
         }
 
         if (post) {
@@ -525,14 +540,17 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                             childLeft = paddingLeft
                             paddingLeft += child.measuredWidth
                         }
+
                         Gravity.CENTER_HORIZONTAL -> childLeft = max(
                             (width - child.measuredWidth) / 2,
                             paddingLeft
                         )
+
                         Gravity.END -> {
                             childLeft = width - paddingRight - child.measuredWidth
                             paddingRight += child.measuredWidth
                         }
+
                         else -> childLeft = paddingLeft
                     }
                     when (vgrav) {
@@ -540,14 +558,17 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                             childTop = paddingTop
                             paddingTop += child.measuredHeight
                         }
+
                         Gravity.CENTER_VERTICAL -> childTop = max(
                             (height - child.measuredHeight) / 2,
                             paddingTop
                         )
+
                         Gravity.BOTTOM -> {
                             childTop = height - paddingBottom - child.measuredHeight
                             paddingBottom += child.measuredHeight
                         }
+
                         else -> childTop = paddingTop
                     }
                     childLeft += scrollX
@@ -655,14 +676,17 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                         childLeft = paddingLeft
                         paddingLeft += child.width
                     }
+
                     Gravity.CENTER_HORIZONTAL -> childLeft = max(
                         (width - child.measuredWidth) / 2,
                         paddingLeft
                     )
+
                     Gravity.END -> {
                         childLeft = width - paddingRight - child.measuredWidth
                         paddingRight += child.measuredWidth
                     }
+
                     else -> childLeft = paddingLeft
                 }
                 childLeft += scrollX
@@ -727,6 +751,7 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
 
                 mActivePointerId = ev.getPointerId(0)
             }
+
             MotionEvent.ACTION_MOVE -> {
                 if ((mLastMotionX > (width - mGutterSize)) || (mLastMotionX < mGutterSize)) {
                     requestDisallowInterceptTouchEvent(true)
@@ -753,6 +778,7 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     }
                 }
             }
+
             MotionEvent.ACTION_UP -> when {
                 mIsBeingDragged -> {
                     mIsBeingDragged = false
@@ -794,9 +820,11 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                             targetPage < 0 -> {
                                 scrollLeft(animated = true)
                             }
+
                             targetPage >= numPages -> {
                                 scrollRight(animated = true)
                             }
+
                             else -> {
                                 setCurrentItemInternal(targetPage, true, velocity)
                             }
@@ -816,12 +844,14 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                 mIsBeingDragged = false
                 scrollToItem(mCurItem, true, 0, false)
             }
+
             MotionEvent.ACTION_POINTER_DOWN -> {
                 val index = ev.actionIndex
                 val x = ev.safeGetX(index)
                 mLastMotionX = x
                 mActivePointerId = ev.getPointerId(index)
             }
+
             MotionEvent.ACTION_POINTER_UP -> {
                 onSecondaryPointerUp(ev)
                 mLastMotionX = ev.safeGetX(ev.findPointerIndex(mActivePointerId))
@@ -933,11 +963,13 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         var handled = false
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> handled = if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
-                    pageLeft()
-                } else {
-                    arrowScroll(View.FOCUS_LEFT)
-                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> handled =
+                    if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
+                        pageLeft()
+                    } else {
+                        arrowScroll(View.FOCUS_LEFT)
+                    }
+
                 KeyEvent.KEYCODE_DPAD_RIGHT -> handled = if (event.hasModifiers(
                         KeyEvent.META_ALT_ON
                     )
@@ -946,6 +978,7 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                 } else {
                     arrowScroll(View.FOCUS_RIGHT)
                 }
+
                 KeyEvent.KEYCODE_TAB -> if (event.hasNoModifiers()) {
                     handled = arrowScroll(View.FOCUS_FORWARD)
                 } else if (event.hasModifiers(KeyEvent.META_SHIFT_ON)) {
@@ -1117,11 +1150,12 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         }
     }
 
-    internal val numPages: Int get() =
-        getClientWidth()
-            ?.let { clientWidth -> (computeHorizontalScrollRange() / clientWidth.toDouble()).roundToInt() }
-            ?.coerceAtLeast(1)
-            ?: 1
+    internal val numPages: Int
+        get() =
+            getClientWidth()
+                ?.let { clientWidth -> (computeHorizontalScrollRange() / clientWidth.toDouble()).roundToInt() }
+                ?.coerceAtLeast(1)
+                ?: 1
 
     enum class OverscrollMode {
         NONE,
