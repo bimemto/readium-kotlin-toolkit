@@ -90,7 +90,7 @@ internal class MetadataParser(
             refines = refines,
             href = Href(filePath.resolve(href)),
             rels = rel.toSet(),
-            mediaType = mediaType?.let { MediaType(it) },
+            mediaType = mediaType?.let { MediaType.invoke(it) },
             properties = properties
         )
     }

@@ -60,7 +60,7 @@ data class Book(
     val url: AbsoluteUrl get() = AbsoluteUrl(href)!!
 
     val mediaType: MediaType get() =
-        MediaType(rawMediaType)!!
+        MediaType.invoke(rawMediaType)!!
 
     companion object {
 

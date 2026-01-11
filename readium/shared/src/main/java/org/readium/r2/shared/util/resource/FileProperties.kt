@@ -27,11 +27,11 @@ public var Resource.Properties.Builder.filename: String?
 
 public val Resource.Properties.mediaType: MediaType?
     get() = (this[MEDIA_TYPE_KEY] as? String?)
-        ?.let { MediaType(it) }
+        ?.let { MediaType.invoke(it) }
 
 public var Resource.Properties.Builder.mediaType: MediaType?
     get() = (this[MEDIA_TYPE_KEY] as? String?)
-        ?.let { MediaType(it) }
+        ?.let { MediaType.invoke(it) }
     set(value) {
         if (value == null) {
             remove(MEDIA_TYPE_KEY)

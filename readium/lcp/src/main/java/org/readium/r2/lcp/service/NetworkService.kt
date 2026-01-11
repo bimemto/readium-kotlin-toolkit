@@ -141,7 +141,7 @@ internal class NetworkService {
             }
 
             connection.contentType
-                ?.let { MediaType(it) }
+                ?.let { MediaType.invoke(it) }
                 ?: mediaType
         } catch (e: Exception) {
             Timber.e(e)

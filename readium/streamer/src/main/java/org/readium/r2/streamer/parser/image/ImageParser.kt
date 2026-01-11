@@ -129,7 +129,7 @@ public class ImageParser(
             container = container,
             servicesBuilder = Publication.ServicesBuilder(
                 positions = PerResourcePositionsService.createFactory(
-                    fallbackMediaType = MediaType("image/*")!!
+                    fallbackMediaType = MediaType.invoke("image/*")!!
                 )
             )
         )

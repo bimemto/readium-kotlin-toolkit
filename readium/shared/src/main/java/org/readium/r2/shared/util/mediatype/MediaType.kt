@@ -110,7 +110,7 @@ public class MediaType private constructor(
      * Returns whether the given [other] media type is included in this media type.
      */
     public fun contains(other: String?): Boolean {
-        val mediaType = other?.let { MediaType(it) }
+        val mediaType = other?.let { MediaType.invoke(it) }
             ?: return false
 
         return contains(mediaType)
@@ -131,7 +131,7 @@ public class MediaType private constructor(
      * in both media types.
      */
     public fun matches(other: String?): Boolean =
-        matches(other?.let { MediaType(it) })
+        matches(other?.let { MediaType.invoke(it) })
 
     /**
      * Returns whether this media type matches any of the `others` media types.
@@ -252,83 +252,83 @@ public class MediaType private constructor(
         //
         // Reading apps are welcome to extend the static constants with additional media types.
 
-        public val AAC: MediaType = MediaType("audio/aac")!!
-        public val ACSM: MediaType = MediaType("application/vnd.adobe.adept+xml")!!
-        public val AIFF: MediaType = MediaType("audio/aiff")!!
-        public val AVI: MediaType = MediaType("video/x-msvideo")!!
-        public val AVIF: MediaType = MediaType("image/avif")!!
-        public val BINARY: MediaType = MediaType("application/octet-stream")!!
-        public val BMP: MediaType = MediaType("image/bmp")!!
-        public val CBR: MediaType = MediaType("application/vnd.comicbook-rar")!!
-        public val CBZ: MediaType = MediaType("application/vnd.comicbook+zip")!!
-        public val CSS: MediaType = MediaType("text/css")!!
-        public val DIVINA: MediaType = MediaType("application/divina+zip")!!
-        public val DIVINA_MANIFEST: MediaType = MediaType("application/divina+json")!!
-        public val EPUB: MediaType = MediaType("application/epub+zip")!!
-        public val FLAC: MediaType = MediaType("audio/flac")!!
-        public val GIF: MediaType = MediaType("image/gif")!!
-        public val GZ: MediaType = MediaType("application/gzip")!!
-        public val HTML: MediaType = MediaType("text/html")!!
-        public val JAVASCRIPT: MediaType = MediaType("text/javascript")!!
-        public val JPEG: MediaType = MediaType("image/jpeg")!!
-        public val JSON: MediaType = MediaType("application/json")!!
-        public val JSON_PROBLEM_DETAILS: MediaType = MediaType("application/problem+json")!!
-        public val JXL: MediaType = MediaType("image/jxl")!!
-        public val LCP_LICENSE_DOCUMENT: MediaType = MediaType(
+        public val AAC: MediaType = MediaType.invoke("audio/aac")!!
+        public val ACSM: MediaType = MediaType.invoke("application/vnd.adobe.adept+xml")!!
+        public val AIFF: MediaType = MediaType.invoke("audio/aiff")!!
+        public val AVI: MediaType = MediaType.invoke("video/x-msvideo")!!
+        public val AVIF: MediaType = MediaType.invoke("image/avif")!!
+        public val BINARY: MediaType = MediaType.invoke("application/octet-stream")!!
+        public val BMP: MediaType = MediaType.invoke("image/bmp")!!
+        public val CBR: MediaType = MediaType.invoke("application/vnd.comicbook-rar")!!
+        public val CBZ: MediaType = MediaType.invoke("application/vnd.comicbook+zip")!!
+        public val CSS: MediaType = MediaType.invoke("text/css")!!
+        public val DIVINA: MediaType = MediaType.invoke("application/divina+zip")!!
+        public val DIVINA_MANIFEST: MediaType = MediaType.invoke("application/divina+json")!!
+        public val EPUB: MediaType = MediaType.invoke("application/epub+zip")!!
+        public val FLAC: MediaType = MediaType.invoke("audio/flac")!!
+        public val GIF: MediaType = MediaType.invoke("image/gif")!!
+        public val GZ: MediaType = MediaType.invoke("application/gzip")!!
+        public val HTML: MediaType = MediaType.invoke("text/html")!!
+        public val JAVASCRIPT: MediaType = MediaType.invoke("text/javascript")!!
+        public val JPEG: MediaType = MediaType.invoke("image/jpeg")!!
+        public val JSON: MediaType = MediaType.invoke("application/json")!!
+        public val JSON_PROBLEM_DETAILS: MediaType = MediaType.invoke("application/problem+json")!!
+        public val JXL: MediaType = MediaType.invoke("image/jxl")!!
+        public val LCP_LICENSE_DOCUMENT: MediaType = MediaType.invoke(
             "application/vnd.readium.lcp.license.v1.0+json"
         )!!
-        public val LCP_PROTECTED_AUDIOBOOK: MediaType = MediaType("application/audiobook+lcp")!!
-        public val LCP_PROTECTED_PDF: MediaType = MediaType("application/pdf+lcp")!!
-        public val LCP_STATUS_DOCUMENT: MediaType = MediaType(
+        public val LCP_PROTECTED_AUDIOBOOK: MediaType = MediaType.invoke("application/audiobook+lcp")!!
+        public val LCP_PROTECTED_PDF: MediaType = MediaType.invoke("application/pdf+lcp")!!
+        public val LCP_STATUS_DOCUMENT: MediaType = MediaType.invoke(
             "application/vnd.readium.license.status.v1.0+json"
         )!!
-        public val LPF: MediaType = MediaType("application/lpf+zip")!!
-        public val MP3: MediaType = MediaType("audio/mpeg")!!
-        public val MP4: MediaType = MediaType("audio/mp4")!!
-        public val MPEG: MediaType = MediaType("video/mpeg")!!
-        public val NCX: MediaType = MediaType("application/x-dtbncx+xml")!!
-        public val OGG: MediaType = MediaType("audio/ogg")!!
-        public val OGV: MediaType = MediaType("video/ogg")!!
-        public val OPDS1: MediaType = MediaType("application/atom+xml;profile=opds-catalog")!!
-        public val OPDS1_NAVIGATION_FEED: MediaType = MediaType(
+        public val LPF: MediaType = MediaType.invoke("application/lpf+zip")!!
+        public val MP3: MediaType = MediaType.invoke("audio/mpeg")!!
+        public val MP4: MediaType = MediaType.invoke("audio/mp4")!!
+        public val MPEG: MediaType = MediaType.invoke("video/mpeg")!!
+        public val NCX: MediaType = MediaType.invoke("application/x-dtbncx+xml")!!
+        public val OGG: MediaType = MediaType.invoke("audio/ogg")!!
+        public val OGV: MediaType = MediaType.invoke("video/ogg")!!
+        public val OPDS1: MediaType = MediaType.invoke("application/atom+xml;profile=opds-catalog")!!
+        public val OPDS1_NAVIGATION_FEED: MediaType = MediaType.invoke(
             "application/atom+xml;profile=opds-catalog;kind=navigation"
         )!!
-        public val OPDS1_ACQUISITION_FEED: MediaType = MediaType(
+        public val OPDS1_ACQUISITION_FEED: MediaType = MediaType.invoke(
             "application/atom+xml;profile=opds-catalog;kind=acquisition"
         )!!
-        public val OPDS1_ENTRY: MediaType = MediaType(
+        public val OPDS1_ENTRY: MediaType = MediaType.invoke(
             "application/atom+xml;type=entry;profile=opds-catalog"
         )!!
-        public val OPDS2: MediaType = MediaType("application/opds+json")!!
-        public val OPDS2_PUBLICATION: MediaType = MediaType("application/opds-publication+json")!!
-        public val OPDS_AUTHENTICATION: MediaType = MediaType(
+        public val OPDS2: MediaType = MediaType.invoke("application/opds+json")!!
+        public val OPDS2_PUBLICATION: MediaType = MediaType.invoke("application/opds-publication+json")!!
+        public val OPDS_AUTHENTICATION: MediaType = MediaType.invoke(
             "application/opds-authentication+json"
         )!!
-        public val OPUS: MediaType = MediaType("audio/opus")!!
-        public val OTF: MediaType = MediaType("font/otf")!!
-        public val PDF: MediaType = MediaType("application/pdf")!!
-        public val PNG: MediaType = MediaType("image/png")!!
-        public val RAR: MediaType = MediaType("application/vnd.rar")!!
-        public val READIUM_AUDIOBOOK: MediaType = MediaType("application/audiobook+zip")!!
-        public val READIUM_AUDIOBOOK_MANIFEST: MediaType = MediaType("application/audiobook+json")!!
-        public val READIUM_WEBPUB: MediaType = MediaType("application/webpub+zip")!!
-        public val READIUM_WEBPUB_MANIFEST: MediaType = MediaType("application/webpub+json")!!
-        public val SMIL: MediaType = MediaType("application/smil+xml")!!
-        public val SVG: MediaType = MediaType("image/svg+xml")!!
-        public val TEXT: MediaType = MediaType("text/plain")!!
-        public val TIFF: MediaType = MediaType("image/tiff")!!
-        public val TTF: MediaType = MediaType("font/ttf")!!
+        public val OPUS: MediaType = MediaType.invoke("audio/opus")!!
+        public val OTF: MediaType = MediaType.invoke("font/otf")!!
+        public val PDF: MediaType = MediaType.invoke("application/pdf")!!
+        public val PNG: MediaType = MediaType.invoke("image/png")!!
+        public val RAR: MediaType = MediaType.invoke("application/vnd.rar")!!
+        public val READIUM_AUDIOBOOK: MediaType = MediaType.invoke("application/audiobook+zip")!!
+        public val READIUM_AUDIOBOOK_MANIFEST: MediaType = MediaType.invoke("application/audiobook+json")!!
+        public val READIUM_WEBPUB: MediaType = MediaType.invoke("application/webpub+zip")!!
+        public val READIUM_WEBPUB_MANIFEST: MediaType = MediaType.invoke("application/webpub+json")!!
+        public val SMIL: MediaType = MediaType.invoke("application/smil+xml")!!
+        public val SVG: MediaType = MediaType.invoke("image/svg+xml")!!
+        public val TEXT: MediaType = MediaType.invoke("text/plain")!!
+        public val TIFF: MediaType = MediaType.invoke("image/tiff")!!
+        public val TTF: MediaType = MediaType.invoke("font/ttf")!!
         public val W3C_WPUB_MANIFEST: MediaType =
-            MediaType("application/x.readium.w3c.wpub+json")!! // non-existent
-        public val WAV: MediaType = MediaType("audio/wav")!!
-        public val WEBM_AUDIO: MediaType = MediaType("audio/webm")!!
-        public val WEBM_VIDEO: MediaType = MediaType("video/webm")!!
-        public val WEBP: MediaType = MediaType("image/webp")!!
-        public val WOFF: MediaType = MediaType("font/woff")!!
-        public val WOFF2: MediaType = MediaType("font/woff2")!!
-        public val XHTML: MediaType = MediaType("application/xhtml+xml")!!
-        public val XML: MediaType = MediaType("application/xml")!!
-        public val ZAB: MediaType = MediaType("application/x.readium.zab+zip")!! // non-existent
-        public val ZIP: MediaType = MediaType("application/zip")!!
+            MediaType.invoke("application/x.readium.w3c.wpub+json")!! // non-existent
+        public val WAV: MediaType = MediaType.invoke("audio/wav")!!
+        public val WEBM_AUDIO: MediaType = MediaType.invoke("audio/webm")!!
+        public val WEBM_VIDEO: MediaType = MediaType.invoke("video/webm")!!
+        public val WEBP: MediaType = MediaType.invoke("image/webp")!!
+        public val WOFF: MediaType = MediaType.invoke("font/woff")!!
+        public val WOFF2: MediaType = MediaType.invoke("font/woff2")!!
+        public val XHTML: MediaType = MediaType.invoke("application/xhtml+xml")!!
+        public val XML: MediaType = MediaType.invoke("application/xml")!!
+        public val ZAB: MediaType = MediaType.invoke("application/x.readium.zab+zip")!! // non-existent
+        public val ZIP: MediaType = MediaType.invoke("application/zip")!!
     }
 }

@@ -152,7 +152,7 @@ public class DefaultHttpClient(
                         // JSON Problem Details or OPDS Authentication Document
                         val body = connection.errorStream?.use { it.readBytes() }
 
-                        val mediaType = connection.contentType?.let { MediaType(it) }
+                        val mediaType = connection.contentType?.let { MediaType.invoke(it) }
                         return@withContext Try.failure(
                             HttpError.ErrorResponse(HttpStatus(statusCode), mediaType, body)
                         )
@@ -163,7 +163,7 @@ public class DefaultHttpClient(
                         url = request.url,
                         statusCode = HttpStatus(statusCode),
                         headers = connection.safeHeaders,
-                        mediaType = connection.contentType?.let { MediaType(it) }
+                        mediaType = connection.contentType?.let { MediaType.invoke(it) }
                     )
 
                     callback.onResponseReceived(request, response)

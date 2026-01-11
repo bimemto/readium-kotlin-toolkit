@@ -49,7 +49,7 @@ data class Bookmark(
     val locator
         get() = Locator(
             href = Url(resourceHref)!!,
-            mediaType = MediaType(resourceType) ?: MediaType.BINARY,
+            mediaType = MediaType.invoke(resourceType) ?: MediaType.BINARY,
             title = resourceTitle,
             locations = Locator.Locations.fromJSON(JSONObject(location)),
             text = Locator.Text.fromJSON(JSONObject(locatorText))

@@ -147,7 +147,6 @@ public data class MutableFontFaceDeclaration internal constructor(
      * using `<link rel="preload">`.
      */
     public fun addSource(href: Url, preload: Boolean = false) {
-        Log.d("FACK", "add source: $href")
         this.sources.add(FontFaceSource(href = href, preload = preload))
     }
 

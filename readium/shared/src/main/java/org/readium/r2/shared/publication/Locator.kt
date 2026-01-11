@@ -233,7 +233,7 @@ public data class Locator(
                 return null
             }
 
-            val mediaType = MediaType(type) ?: run {
+            val mediaType = MediaType.invoke(type) ?: run {
                 warnings?.log(Locator::class.java, "[type] is not a valid media type", json)
                 return null
             }

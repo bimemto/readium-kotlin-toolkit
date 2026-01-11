@@ -134,7 +134,7 @@ public data class Link(
             return Link(
                 href = parseHref(json, warnings) ?: return null,
                 mediaType = json.optNullableString("type")
-                    ?.let { MediaType(it) },
+                    ?.let { MediaType.invoke(it) },
                 title = json.optNullableString("title"),
                 rels = json.optStringsFromArrayOrSingle("rel").toSet(),
                 properties = Properties.fromJSON(json.optJSONObject("properties")),

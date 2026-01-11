@@ -67,7 +67,7 @@ public class ContentResource(
 
         val mediaType =
             contentResolver.getType(uri)
-                ?.let { MediaType(it) }
+                ?.let { MediaType.invoke(it) }
                 ?.takeUnless { it.matches(MediaType.BINARY) }
 
         val properties =

@@ -515,12 +515,12 @@ class LocatorCollectionTest {
                     Link(
                         rels = setOf("self"),
                         href = Href("/978-1503222687/search?query=apple")!!,
-                        mediaType = MediaType("application/vnd.readium.locators+json")!!
+                        mediaType = MediaType.invoke("application/vnd.readium.locators+json")!!
                     ),
                     Link(
                         rels = setOf("next"),
                         href = Href("/978-1503222687/search?query=apple&page=2")!!,
-                        mediaType = MediaType("application/vnd.readium.locators+json")!!
+                        mediaType = MediaType.invoke("application/vnd.readium.locators+json")!!
                     )
                 ),
                 locators = listOf(
@@ -683,12 +683,12 @@ class LocatorCollectionTest {
                     Link(
                         rels = setOf("self"),
                         href = Href("/978-1503222687/search?query=apple")!!,
-                        mediaType = MediaType("application/vnd.readium.locators+json")!!
+                        mediaType = MediaType.invoke("application/vnd.readium.locators+json")!!
                     ),
                     Link(
                         rels = setOf("next"),
                         href = Href("/978-1503222687/search?query=apple&page=2")!!,
-                        mediaType = MediaType("application/vnd.readium.locators+json")!!
+                        mediaType = MediaType.invoke("application/vnd.readium.locators+json")!!
                     )
                 ),
                 locators = listOf(

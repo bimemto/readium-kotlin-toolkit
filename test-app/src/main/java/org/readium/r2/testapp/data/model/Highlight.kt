@@ -89,7 +89,7 @@ data class Highlight(
 
     val locator: Locator get() = Locator(
         href = Url(href)!!,
-        mediaType = MediaType(type) ?: MediaType.BINARY,
+        mediaType = MediaType.invoke(type) ?: MediaType.BINARY,
         title = title,
         locations = locations,
         text = text

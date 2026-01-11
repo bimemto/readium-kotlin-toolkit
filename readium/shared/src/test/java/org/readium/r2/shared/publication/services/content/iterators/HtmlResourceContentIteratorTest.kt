@@ -480,11 +480,11 @@ class HtmlResourceContentIteratorTest {
                     ),
                     embeddedLink = Link(
                         href = Href("/dir/video.mp4")!!,
-                        mediaType = MediaType("video/mp4")!!,
+                        mediaType = MediaType.invoke("video/mp4")!!,
                         alternates = listOf(
                             Link(
                                 href = Href("/dir/video.m4v")!!,
-                                mediaType = MediaType("video/x-m4v")!!
+                                mediaType = MediaType.invoke("video/x-m4v")!!
                             )
                         )
                     ),

@@ -150,7 +150,7 @@ public class OPDS1Parser {
 
                         val newLink = Link(
                             href = feed.href.resolve(href),
-                            mediaType = link.getAttr("type")?.let { MediaType(it) },
+                            mediaType = link.getAttr("type")?.let { MediaType.invoke(it) },
                             title = entry.getFirst("title", Namespaces.Atom)?.text,
                             rels = listOfNotNull(link.getAttr("rel")).toSet(),
                             properties = Properties(otherProperties = otherProperties)

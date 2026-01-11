@@ -49,7 +49,7 @@ public data class Link(
             return Link(
                 href = href,
                 mediaType = json.optNullableString("type")
-                    ?.let { MediaType(it) },
+                    ?.let { MediaType.invoke(it) },
                 title = json.optNullableString("title"),
                 rels = json.optStringsFromArrayOrSingle("rel").toSet()
                     .takeIf { it.isNotEmpty() }

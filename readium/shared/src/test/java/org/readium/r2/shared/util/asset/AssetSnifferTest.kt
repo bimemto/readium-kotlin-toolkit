@@ -49,7 +49,7 @@ class AssetSnifferTest {
         sniffHints(FormatHints(fileExtension = extension?.let { FileExtension((it)) }))
 
     private suspend fun AssetSniffer.sniffMediaType(mediaType: String?): Try<Format, AssetSniffer.SniffError> =
-        sniffHints(FormatHints(mediaType = mediaType?.let { MediaType(it) }))
+        sniffHints(FormatHints(mediaType = mediaType?.let { MediaType.invoke(it) }))
 
     private val epubFormat =
         Format(
@@ -811,7 +811,7 @@ class AssetSnifferTest {
             format,
             sniffer.sniff(
                 resource = StringResource("""{"title": "Message"}"""),
-                hints = FormatHints(mediaType = MediaType("application/problem+json")!!)
+                hints = FormatHints(mediaType = MediaType.invoke("application/problem+json")!!)
             ).checkSuccess()
         )
     }

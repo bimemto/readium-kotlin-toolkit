@@ -7,15 +7,15 @@ class MediaTypeTest {
 
     @Test
     fun `returns null for invalid types`() {
-        assertNull(MediaType("application"))
-        assertNull(MediaType("application/atom+xml/extra"))
+        assertNull(MediaType.invoke("application"))
+        assertNull(MediaType.invoke("application/atom+xml/extra"))
     }
 
     @Test
     fun `to string`() {
         assertEquals(
             "application/atom+xml;profile=opds-catalog",
-            MediaType("application/atom+xml;profile=opds-catalog")?.toString()
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")?.toString()
         )
     }
 
@@ -23,16 +23,16 @@ class MediaTypeTest {
     fun `to string is normalized`() {
         assertEquals(
             "application/atom+xml;a=0;profile=OPDS-CATALOG",
-            MediaType("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG   ;   a=0")?.toString()
+            MediaType.invoke("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG   ;   a=0")?.toString()
         )
         // Parameters are sorted by name
         assertEquals(
             "application/atom+xml;a=0;b=1",
-            MediaType("application/atom+xml;a=0;b=1")?.toString()
+            MediaType.invoke("application/atom+xml;a=0;b=1")?.toString()
         )
         assertEquals(
             "application/atom+xml;a=0;b=1",
-            MediaType("application/atom+xml;b=1;a=0")?.toString()
+            MediaType.invoke("application/atom+xml;b=1;a=0")?.toString()
         )
     }
 
@@ -40,18 +40,18 @@ class MediaTypeTest {
     fun `get type`() {
         assertEquals(
             "application",
-            MediaType("application/atom+xml;profile=opds-catalog")?.type
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")?.type
         )
-        assertEquals("*", MediaType("*/jpeg")?.type)
+        assertEquals("*", MediaType.invoke("*/jpeg")?.type)
     }
 
     @Test
     fun `get subtype`() {
         assertEquals(
             "atom+xml",
-            MediaType("application/atom+xml;profile=opds-catalog")?.subtype
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")?.subtype
         )
-        assertEquals("*", MediaType("image/*")?.subtype)
+        assertEquals("*", MediaType.invoke("image/*")?.subtype)
     }
 
     @Test
@@ -61,13 +61,13 @@ class MediaTypeTest {
                 "type" to "entry",
                 "profile" to "opds-catalog"
             ),
-            MediaType("application/atom+xml;type=entry;profile=opds-catalog")?.parameters
+            MediaType.invoke("application/atom+xml;type=entry;profile=opds-catalog")?.parameters
         )
     }
 
     @Test
     fun `get empty parameters`() {
-        assertTrue(MediaType("application/atom+xml")!!.parameters.isEmpty())
+        assertTrue(MediaType.invoke("application/atom+xml")!!.parameters.isEmpty())
     }
 
     @Test
@@ -77,7 +77,7 @@ class MediaTypeTest {
                 "type" to "entry",
                 "profile" to "opds-catalog"
             ),
-            MediaType(
+            MediaType.invoke(
                 "application/atom+xml    ;    type=entry   ;    profile=opds-catalog   "
             )?.parameters
         )
@@ -85,22 +85,22 @@ class MediaTypeTest {
 
     @Test
     fun `get structured syntax suffix`() {
-        assertNull(MediaType("foo/bar")?.structuredSyntaxSuffix)
-        assertNull(MediaType("application/zip")?.structuredSyntaxSuffix)
-        assertEquals("+zip", MediaType("application/epub+zip")?.structuredSyntaxSuffix)
-        assertEquals("+zip", MediaType("foo/bar+json+zip")?.structuredSyntaxSuffix)
+        assertNull(MediaType.invoke("foo/bar")?.structuredSyntaxSuffix)
+        assertNull(MediaType.invoke("application/zip")?.structuredSyntaxSuffix)
+        assertEquals("+zip", MediaType.invoke("application/epub+zip")?.structuredSyntaxSuffix)
+        assertEquals("+zip", MediaType.invoke("foo/bar+json+zip")?.structuredSyntaxSuffix)
     }
 
     @Test
     fun `get charset`() {
-        assertNull(MediaType("text/html")?.charset)
-        assertEquals(Charsets.UTF_8, MediaType("text/html;charset=utf-8")?.charset)
-        assertEquals(Charsets.UTF_16, MediaType("text/html;charset=utf-16")?.charset)
+        assertNull(MediaType.invoke("text/html")?.charset)
+        assertEquals(Charsets.UTF_8, MediaType.invoke("text/html;charset=utf-8")?.charset)
+        assertEquals(Charsets.UTF_16, MediaType.invoke("text/html;charset=utf-16")?.charset)
     }
 
     @Test
     fun `type, subtype and parameter names are lowercased`() {
-        val mediaType = MediaType("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG")
+        val mediaType = MediaType.invoke("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG")
         assertEquals("application", mediaType?.type)
         assertEquals("atom+xml", mediaType?.subtype)
         assertEquals(mapOf("profile" to "OPDS-CATALOG"), mediaType?.parameters)
@@ -110,7 +110,7 @@ class MediaTypeTest {
     fun `charset value is uppercased`() {
         assertEquals(
             "UTF-8",
-            MediaType("text/html;charset=utf-8")?.parameters?.get("charset")
+            MediaType.invoke("text/html;charset=utf-8")?.parameters?.get("charset")
         )
     }
 
@@ -118,71 +118,71 @@ class MediaTypeTest {
     fun `charset value is canonicalized`() {
         assertEquals(
             "US-ASCII",
-            MediaType("text/html;charset=ascii")?.parameters?.get("charset")
+            MediaType.invoke("text/html;charset=ascii")?.parameters?.get("charset")
         )
         assertEquals(
             "UNKNOWN",
-            MediaType("text/html;charset=unknown")?.parameters?.get("charset")
+            MediaType.invoke("text/html;charset=unknown")?.parameters?.get("charset")
         )
     }
 
     @Test
     fun equality() {
         assertEquals(
-            MediaType("application/atom+xml")!!,
-            MediaType("application/atom+xml")!!
+            MediaType.invoke("application/atom+xml")!!,
+            MediaType.invoke("application/atom+xml")!!
         )
         assertEquals(
-            MediaType("application/atom+xml;profile=opds-catalog")!!,
-            MediaType("application/atom+xml;profile=opds-catalog")!!
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")!!,
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")!!
         )
         assertNotEquals(
-            MediaType("application/atom+xml")!!,
-            MediaType("application/atom")!!
+            MediaType.invoke("application/atom+xml")!!,
+            MediaType.invoke("application/atom")!!
         )
         assertNotEquals(
-            MediaType("application/atom+xml")!!,
-            MediaType("text/atom+xml")!!
+            MediaType.invoke("application/atom+xml")!!,
+            MediaType.invoke("text/atom+xml")!!
         )
         assertNotEquals(
-            MediaType("application/atom+xml;profile=opds-catalog")!!,
-            MediaType("application/atom+xml")!!
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")!!,
+            MediaType.invoke("application/atom+xml")!!
         )
     }
 
     @Test
     fun `equality ignores case of type, subtype and parameter names`() {
         assertEquals(
-            MediaType("application/atom+xml;profile=opds-catalog")!!,
-            MediaType("APPLICATION/ATOM+XML;PROFILE=opds-catalog")!!
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")!!,
+            MediaType.invoke("APPLICATION/ATOM+XML;PROFILE=opds-catalog")!!
         )
         assertNotEquals(
-            MediaType("application/atom+xml;profile=opds-catalog")!!,
-            MediaType("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG")!!
+            MediaType.invoke("application/atom+xml;profile=opds-catalog")!!,
+            MediaType.invoke("APPLICATION/ATOM+XML;PROFILE=OPDS-CATALOG")!!
         )
     }
 
     @Test
     fun `equality ignores parameters order`() {
         assertEquals(
-            MediaType("application/atom+xml;type=entry;profile=opds-catalog")!!,
-            MediaType("application/atom+xml;profile=opds-catalog;type=entry")!!
+            MediaType.invoke("application/atom+xml;type=entry;profile=opds-catalog")!!,
+            MediaType.invoke("application/atom+xml;profile=opds-catalog;type=entry")!!
         )
     }
 
     @Test
     fun `equality ignores charset case`() {
         assertEquals(
-            MediaType("application/atom+xml;charset=utf-8")!!,
-            MediaType("application/atom+xml;charset=UTF-8")!!
+            MediaType.invoke("application/atom+xml;charset=utf-8")!!,
+            MediaType.invoke("application/atom+xml;charset=UTF-8")!!
         )
     }
 
     @Test
     fun `contains equal media type`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8")!!.contains(
-                MediaType("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8")!!.contains(
+                MediaType.invoke("text/html;charset=utf-8")
             )
         )
     }
@@ -190,20 +190,20 @@ class MediaTypeTest {
     @Test
     fun `contains must match parameters`() {
         assertFalse(
-            MediaType("text/html;charset=utf-8")!!.contains(
-                MediaType("text/html;charset=ascii")
+            MediaType.invoke("text/html;charset=utf-8")!!.contains(
+                MediaType.invoke("text/html;charset=ascii")
             )
         )
         assertFalse(
-            MediaType("text/html;charset=utf-8")!!.contains(MediaType("text/html"))
+            MediaType.invoke("text/html;charset=utf-8")!!.contains(MediaType.invoke("text/html"))
         )
     }
 
     @Test
     fun `contains ignores parameters order`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8;type=entry")!!.contains(
-                MediaType("text/html;type=entry;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8;type=entry")!!.contains(
+                MediaType.invoke("text/html;type=entry;charset=utf-8")
             )
         )
     }
@@ -211,35 +211,35 @@ class MediaTypeTest {
     @Test
     fun `contains ignore extra parameters`() {
         assertTrue(
-            MediaType("text/html")!!.contains(MediaType("text/html;charset=utf-8"))
+            MediaType.invoke("text/html")!!.contains(MediaType.invoke("text/html;charset=utf-8"))
         )
     }
 
     @Test
     fun `contains supports wildcards`() {
         assertTrue(
-            MediaType("*/*")!!.contains(MediaType("text/html;charset=utf-8"))
+            MediaType.invoke("*/*")!!.contains(MediaType.invoke("text/html;charset=utf-8"))
         )
         assertTrue(
-            MediaType("text/*")!!.contains(MediaType("text/html;charset=utf-8"))
+            MediaType.invoke("text/*")!!.contains(MediaType.invoke("text/html;charset=utf-8"))
         )
         assertFalse(
-            MediaType("text/*")!!.contains(MediaType("application/zip"))
+            MediaType.invoke("text/*")!!.contains(MediaType.invoke("application/zip"))
         )
     }
 
     @Test
     fun `contains from string`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8")!!.contains("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8")!!.contains("text/html;charset=utf-8")
         )
     }
 
     @Test
     fun `matches equal media type`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8")!!.matches(
-                MediaType("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8")!!.matches(
+                MediaType.invoke("text/html;charset=utf-8")
             )
         )
     }
@@ -247,8 +247,8 @@ class MediaTypeTest {
     @Test
     fun `matches must match parameters`() {
         assertFalse(
-            MediaType("text/html;charset=ascii")!!.matches(
-                MediaType("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=ascii")!!.matches(
+                MediaType.invoke("text/html;charset=utf-8")
             )
         )
     }
@@ -256,8 +256,8 @@ class MediaTypeTest {
     @Test
     fun `matches ignores parameters order`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8;type=entry")!!.matches(
-                MediaType("text/html;type=entry;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8;type=entry")!!.matches(
+                MediaType.invoke("text/html;type=entry;charset=utf-8")
             )
         )
     }
@@ -265,146 +265,146 @@ class MediaTypeTest {
     @Test
     fun `matches ignores extra parameters`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8")!!.matches(
-                MediaType("text/html;charset=utf-8;extra=param")
+            MediaType.invoke("text/html;charset=utf-8")!!.matches(
+                MediaType.invoke("text/html;charset=utf-8;extra=param")
             )
         )
         assertTrue(
-            MediaType("text/html;charset=utf-8;extra=param")!!.matches(
-                MediaType("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8;extra=param")!!.matches(
+                MediaType.invoke("text/html;charset=utf-8")
             )
         )
     }
 
     @Test
     fun `matches supports wildcards`() {
-        assertTrue(MediaType("text/html;charset=utf-8")!!.matches(MediaType("*/*")))
-        assertTrue(MediaType("text/html;charset=utf-8")!!.matches(MediaType("text/*")))
-        assertFalse(MediaType("application/zip")!!.matches(MediaType("text/*")))
-        assertTrue(MediaType("*/*")!!.matches(MediaType("text/html;charset=utf-8")))
-        assertTrue(MediaType("text/*")!!.matches(MediaType("text/html;charset=utf-8")))
-        assertFalse(MediaType("text/*")!!.matches(MediaType("application/zip")))
+        assertTrue(MediaType.invoke("text/html;charset=utf-8")!!.matches(MediaType.invoke("*/*")))
+        assertTrue(MediaType.invoke("text/html;charset=utf-8")!!.matches(MediaType.invoke("text/*")))
+        assertFalse(MediaType.invoke("application/zip")!!.matches(MediaType.invoke("text/*")))
+        assertTrue(MediaType.invoke("*/*")!!.matches(MediaType.invoke("text/html;charset=utf-8")))
+        assertTrue(MediaType.invoke("text/*")!!.matches(MediaType.invoke("text/html;charset=utf-8")))
+        assertFalse(MediaType.invoke("text/*")!!.matches(MediaType.invoke("application/zip")))
     }
 
     @Test
     fun `matches from string`() {
         assertTrue(
-            MediaType("text/html;charset=utf-8")!!.matches("text/html;charset=utf-8")
+            MediaType.invoke("text/html;charset=utf-8")!!.matches("text/html;charset=utf-8")
         )
     }
 
     @Test
     fun `matches any media type`() {
         assertTrue(
-            MediaType("text/html")!!.matchesAny(
-                MediaType("application/zip")!!,
-                MediaType("text/html;charset=utf-8")!!
+            MediaType.invoke("text/html")!!.matchesAny(
+                MediaType.invoke("application/zip")!!,
+                MediaType.invoke("text/html;charset=utf-8")!!
             )
         )
         assertFalse(
-            MediaType("text/html")!!.matchesAny(
-                MediaType("application/zip")!!,
-                MediaType("text/plain;charset=utf-8")!!
+            MediaType.invoke("text/html")!!.matchesAny(
+                MediaType.invoke("application/zip")!!,
+                MediaType.invoke("text/plain;charset=utf-8")!!
             )
         )
         assertTrue(
-            MediaType("text/html")!!.matchesAny("application/zip", "text/html;charset=utf-8")
+            MediaType.invoke("text/html")!!.matchesAny("application/zip", "text/html;charset=utf-8")
         )
         assertFalse(
-            MediaType("text/html")!!.matchesAny("application/zip", "text/plain;charset=utf-8")
+            MediaType.invoke("text/html")!!.matchesAny("application/zip", "text/plain;charset=utf-8")
         )
     }
 
     @Test
     fun `is ZIP`() {
-        assertFalse(MediaType("text/plain")!!.isZip)
-        assertTrue(MediaType("application/zip")!!.isZip)
-        assertTrue(MediaType("application/zip;charset=utf-8")!!.isZip)
-        assertTrue(MediaType("application/epub+zip")!!.isZip)
+        assertFalse(MediaType.invoke("text/plain")!!.isZip)
+        assertTrue(MediaType.invoke("application/zip")!!.isZip)
+        assertTrue(MediaType.invoke("application/zip;charset=utf-8")!!.isZip)
+        assertTrue(MediaType.invoke("application/epub+zip")!!.isZip)
         // These media types must be explicitly matched since they don't have any ZIP hint
-        assertTrue(MediaType("application/audiobook+lcp")!!.isZip)
-        assertTrue(MediaType("application/pdf+lcp")!!.isZip)
+        assertTrue(MediaType.invoke("application/audiobook+lcp")!!.isZip)
+        assertTrue(MediaType.invoke("application/pdf+lcp")!!.isZip)
     }
 
     @Test
     fun `is JSON`() {
-        assertFalse(MediaType("text/plain")!!.isJson)
-        assertTrue(MediaType("application/json")!!.isJson)
-        assertTrue(MediaType("application/json;charset=utf-8")!!.isJson)
-        assertTrue(MediaType("application/opds+json")!!.isJson)
+        assertFalse(MediaType.invoke("text/plain")!!.isJson)
+        assertTrue(MediaType.invoke("application/json")!!.isJson)
+        assertTrue(MediaType.invoke("application/json;charset=utf-8")!!.isJson)
+        assertTrue(MediaType.invoke("application/opds+json")!!.isJson)
     }
 
     @Test
     fun `is OPDS`() {
-        assertFalse(MediaType("text/html")!!.isOpds)
-        assertTrue(MediaType("application/atom+xml;profile=opds-catalog")!!.isOpds)
-        assertTrue(MediaType("application/atom+xml;type=entry;profile=opds-catalog")!!.isOpds)
-        assertTrue(MediaType("application/opds+json")!!.isOpds)
-        assertTrue(MediaType("application/opds-publication+json")!!.isOpds)
-        assertTrue(MediaType("application/opds+json;charset=utf-8")!!.isOpds)
-        assertTrue(MediaType("application/opds-authentication+json")!!.isOpds)
+        assertFalse(MediaType.invoke("text/html")!!.isOpds)
+        assertTrue(MediaType.invoke("application/atom+xml;profile=opds-catalog")!!.isOpds)
+        assertTrue(MediaType.invoke("application/atom+xml;type=entry;profile=opds-catalog")!!.isOpds)
+        assertTrue(MediaType.invoke("application/opds+json")!!.isOpds)
+        assertTrue(MediaType.invoke("application/opds-publication+json")!!.isOpds)
+        assertTrue(MediaType.invoke("application/opds+json;charset=utf-8")!!.isOpds)
+        assertTrue(MediaType.invoke("application/opds-authentication+json")!!.isOpds)
     }
 
     @Test
     fun `is HTML`() {
-        assertFalse(MediaType("application/opds+json")!!.isHtml)
-        assertTrue(MediaType("text/html")!!.isHtml)
-        assertTrue(MediaType("application/xhtml+xml")!!.isHtml)
-        assertTrue(MediaType("text/html;charset=utf-8")!!.isHtml)
+        assertFalse(MediaType.invoke("application/opds+json")!!.isHtml)
+        assertTrue(MediaType.invoke("text/html")!!.isHtml)
+        assertTrue(MediaType.invoke("application/xhtml+xml")!!.isHtml)
+        assertTrue(MediaType.invoke("text/html;charset=utf-8")!!.isHtml)
     }
 
     @Test
     fun `is bitmap`() {
-        assertFalse(MediaType("text/html")!!.isBitmap)
-        assertTrue(MediaType("image/bmp")!!.isBitmap)
-        assertTrue(MediaType("image/gif")!!.isBitmap)
-        assertTrue(MediaType("image/jpeg")!!.isBitmap)
-        assertTrue(MediaType("image/png")!!.isBitmap)
-        assertTrue(MediaType("image/tiff")!!.isBitmap)
-        assertTrue(MediaType("image/tiff")!!.isBitmap)
-        assertTrue(MediaType("image/tiff;charset=utf-8")!!.isBitmap)
+        assertFalse(MediaType.invoke("text/html")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/bmp")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/gif")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/jpeg")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/png")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/tiff")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/tiff")!!.isBitmap)
+        assertTrue(MediaType.invoke("image/tiff;charset=utf-8")!!.isBitmap)
     }
 
     @Test
     fun `is audio`() {
-        assertFalse(MediaType("text/html")!!.isAudio)
-        assertTrue(MediaType("audio/unknown")!!.isAudio)
-        assertTrue(MediaType("audio/mpeg;param=value")!!.isAudio)
+        assertFalse(MediaType.invoke("text/html")!!.isAudio)
+        assertTrue(MediaType.invoke("audio/unknown")!!.isAudio)
+        assertTrue(MediaType.invoke("audio/mpeg;param=value")!!.isAudio)
     }
 
     @Test
     fun `is video`() {
-        assertFalse(MediaType("text/html")!!.isVideo)
-        assertTrue(MediaType("video/unknown")!!.isVideo)
-        assertTrue(MediaType("video/mpeg;param=value")!!.isVideo)
+        assertFalse(MediaType.invoke("text/html")!!.isVideo)
+        assertTrue(MediaType.invoke("video/unknown")!!.isVideo)
+        assertTrue(MediaType.invoke("video/mpeg;param=value")!!.isVideo)
     }
 
     @Test
     fun `is RWPM`() {
-        assertFalse(MediaType("text/html")!!.isRwpm)
-        assertTrue(MediaType("application/audiobook+json")!!.isRwpm)
-        assertTrue(MediaType("application/divina+json")!!.isRwpm)
-        assertTrue(MediaType("application/webpub+json")!!.isRwpm)
-        assertTrue(MediaType("application/webpub+json;charset=utf-8")!!.isRwpm)
+        assertFalse(MediaType.invoke("text/html")!!.isRwpm)
+        assertTrue(MediaType.invoke("application/audiobook+json")!!.isRwpm)
+        assertTrue(MediaType.invoke("application/divina+json")!!.isRwpm)
+        assertTrue(MediaType.invoke("application/webpub+json")!!.isRwpm)
+        assertTrue(MediaType.invoke("application/webpub+json;charset=utf-8")!!.isRwpm)
     }
 
     @Test
     fun `is publication`() {
-        assertFalse(MediaType("text/html")!!.isPublication)
-        assertTrue(MediaType("application/audiobook+zip")!!.isPublication)
-        assertTrue(MediaType("application/audiobook+json")!!.isPublication)
-        assertTrue(MediaType("application/audiobook+lcp")!!.isPublication)
-        assertTrue(MediaType("application/audiobook+json;charset=utf-8")!!.isPublication)
-        assertTrue(MediaType("application/divina+zip")!!.isPublication)
-        assertTrue(MediaType("application/divina+json")!!.isPublication)
-        assertTrue(MediaType("application/webpub+zip")!!.isPublication)
-        assertTrue(MediaType("application/webpub+json")!!.isPublication)
-        assertTrue(MediaType("application/vnd.comicbook+zip")!!.isPublication)
-        assertTrue(MediaType("application/epub+zip")!!.isPublication)
-        assertTrue(MediaType("application/lpf+zip")!!.isPublication)
-        assertTrue(MediaType("application/pdf")!!.isPublication)
-        assertTrue(MediaType("application/pdf+lcp")!!.isPublication)
-        assertTrue(MediaType("application/x.readium.w3c.wpub+json")!!.isPublication)
-        assertTrue(MediaType("application/x.readium.zab+zip")!!.isPublication)
+        assertFalse(MediaType.invoke("text/html")!!.isPublication)
+        assertTrue(MediaType.invoke("application/audiobook+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/audiobook+json")!!.isPublication)
+        assertTrue(MediaType.invoke("application/audiobook+lcp")!!.isPublication)
+        assertTrue(MediaType.invoke("application/audiobook+json;charset=utf-8")!!.isPublication)
+        assertTrue(MediaType.invoke("application/divina+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/divina+json")!!.isPublication)
+        assertTrue(MediaType.invoke("application/webpub+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/webpub+json")!!.isPublication)
+        assertTrue(MediaType.invoke("application/vnd.comicbook+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/epub+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/lpf+zip")!!.isPublication)
+        assertTrue(MediaType.invoke("application/pdf")!!.isPublication)
+        assertTrue(MediaType.invoke("application/pdf+lcp")!!.isPublication)
+        assertTrue(MediaType.invoke("application/x.readium.w3c.wpub+json")!!.isPublication)
+        assertTrue(MediaType.invoke("application/x.readium.zab+zip")!!.isPublication)
     }
 }
