@@ -212,6 +212,12 @@ public class EpubNavigatorFragment internal constructor(
         @DelicateReadiumApi
         var disableSelectionWhenProtected: Boolean,
 
+        /**
+         * Called when a chapter fails to render (e.g. malformed XHTML shows XML error page).
+         * The app should show a toast and the WebView content may already be replaced with blank.
+         */
+        var onChapterContentError: ((Link) -> Unit)? = null,
+
         internal var fontFamilyDeclarations: List<FontFamilyDeclaration>,
         internal var javascriptInterfaces: Map<String, JavascriptInterfaceFactory>,
     ) {
@@ -230,6 +236,7 @@ public class EpubNavigatorFragment internal constructor(
             selectionActionModeCallback = selectionActionModeCallback,
             shouldApplyInsetsPadding = shouldApplyInsetsPadding,
             disableSelectionWhenProtected = true,
+            onChapterContentError = null,
             fontFamilyDeclarations = emptyList(),
             javascriptInterfaces = emptyMap()
         )
@@ -811,6 +818,10 @@ public class EpubNavigatorFragment internal constructor(
             }
 
             notifyCurrentLocation()
+        }
+
+        override fun onChapterContentError(link: Link) {
+            config.onChapterContentError?.invoke(link)
         }
 
         override fun javascriptInterfacesForResource(link: Link): Map<String, Any?> =

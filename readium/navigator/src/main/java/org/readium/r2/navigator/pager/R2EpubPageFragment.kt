@@ -13,12 +13,14 @@ package org.readium.r2.navigator.pager
 
 import android.annotation.SuppressLint
 import android.graphics.PointF
+import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.view.*
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.annotation.RequiresApi
 import androidx.core.os.BundleCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.postDelayed
@@ -29,6 +31,7 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.webkit.WebViewClientCompat
+import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlin.coroutines.resume
@@ -77,6 +80,9 @@ internal class R2EpubPageFragment : Fragment() {
 
     private var isLoading: Boolean = false
     private val _isLoaded = MutableStateFlow(false)
+
+    /** True when the WebView is currently showing the chapter error page (so we can refresh it when theme changes). */
+    private var isShowingChapterErrorPage = false
 
     internal fun setFontSize(fontSize: Double) {
         textZoom = (fontSize * 100).roundToInt()
@@ -215,6 +221,18 @@ internal class R2EpubPageFragment : Fragment() {
                 return false
             }
 
+            @RequiresApi(Build.VERSION_CODES.M)
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceErrorCompat
+            ) {
+                if (request.isForMainFrame && view == webView) {
+                    showChapterErrorPage(webView)
+                    link?.let { webView.listener?.onChapterContentError(it) }
+                }
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
 
@@ -226,6 +244,36 @@ internal class R2EpubPageFragment : Fragment() {
 
                 webView.onContentReady {
                     onLoadPage()
+                    // Detect XML parser error page and replace with blank + notify listener (show toast).
+                    link?.let { currentLink ->
+                        val checkScript = """
+                            (function(){
+                                try {
+                                    var body = document.body;
+                                    var root = document.documentElement;
+                                    var text = '';
+                                    if (body) text += (body.innerText || body.textContent || '');
+                                    if (root && root !== body) text += (root.innerText || root.textContent || '');
+                                    text = text.trim();
+                                    return text.indexOf('This page contains the following errors') >= 0
+                                        || text.indexOf('error on line') >= 0
+                                        || text.indexOf('Extra content at the end') >= 0
+                                        || text.indexOf('Below is a rendering') >= 0;
+                                } catch(e) { return false; }
+                            })();
+                        """.trimIndent()
+                        webView.postDelayed({
+                            webView.evaluateJavascript(checkScript) { result ->
+                                val raw = result?.trim() ?: ""
+                                val isTrue = raw.removeSurrounding("\"").equals("true", ignoreCase = true)
+                                if (isTrue) {
+                                    android.util.Log.d("R2EpubPageFragment", "Chapter content error detected, notifying listener")
+                                    showChapterErrorPage(webView)
+                                    webView.listener?.onChapterContentError(currentLink)
+                                }
+                            }
+                        }, 150)
+                    }
                 }
             }
 
@@ -242,6 +290,7 @@ internal class R2EpubPageFragment : Fragment() {
         resourceUrl?.let {
             isLoading = true
             _isLoaded.value = false
+            isShowingChapterErrorPage = false
             webView.loadUrl(it.toString())
         }
 
@@ -302,6 +351,16 @@ internal class R2EpubPageFragment : Fragment() {
             viewModel.isScrollEnabled
                 .flowWithLifecycle(lifecycleOwner.lifecycle)
                 .collectLatest { webView?.scrollModeFlow?.value = it }
+        }
+        // When theme/colors change while showing the chapter error page, refresh it with new colors.
+        lifecycleOwner.lifecycleScope.launch {
+            viewModel.settings
+                .flowWithLifecycle(lifecycleOwner.lifecycle)
+                .collectLatest { _ ->
+                    if (isShowingChapterErrorPage) {
+                        webView?.let { showChapterErrorPage(it) }
+                    }
+                }
         }
     }
 
@@ -388,6 +447,29 @@ internal class R2EpubPageFragment : Fragment() {
         val currentFragment = (epubNavigator.resourcePager.adapter as? R2PagerAdapter)?.getCurrentFragment() as? R2EpubPageFragment ?: return false
         return tag == currentFragment.tag
     }
+
+    private fun showChapterErrorPage(webView: WebView) {
+        isShowingChapterErrorPage = true
+        val settings = viewModel.settings.value
+        val bgColor = settings.backgroundColor?.int ?: settings.theme.backgroundColor
+        val textColor = settings.textColor?.int ?: settings.theme.contentColor
+        webView.setBackgroundColor(bgColor)
+        val html = buildChapterErrorHtml(
+            backgroundColorHex = colorIntToHex(bgColor),
+            textColorHex = colorIntToHex(textColor)
+        )
+        webView.loadDataWithBaseURL(
+            "https://readium/error/",
+            html,
+            "text/html",
+            "UTF-8",
+            null
+        )
+    }
+
+    /** Converts Android color Int (0xAARRGGBB) to CSS hex e.g. #RRGGBB */
+    private fun colorIntToHex(color: Int): String =
+        "#%06X".format(0xFFFFFF and color)
 
     private fun onLoadPage() {
         if (!isLoading) return
@@ -488,6 +570,36 @@ internal class R2EpubPageFragment : Fragment() {
 
     companion object {
         private const val textZoomBundleKey = "org.readium.textZoom"
+
+        /** Builds user-friendly error HTML using reader theme background and text colors. */
+        private fun buildChapterErrorHtml(backgroundColorHex: String, textColorHex: String): String =
+            """
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+            html, body { height: 100%; margin: 0; background-color: $backgroundColorHex; color: $textColorHex; }
+            body {
+                font-family: sans-serif;
+                padding: 2em;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+            h2 { font-size: 1.2em; margin-bottom: 0.5em; }
+            p { margin: 0; font-size: 1em; }
+            </style>
+            </head>
+            <body>
+            <h2>Display Error</h2>
+            <p>Unable to load this chapter.</p>
+            </body>
+            </html>
+            """.trimIndent()
 
         fun newInstance(
             url: AbsoluteUrl,
