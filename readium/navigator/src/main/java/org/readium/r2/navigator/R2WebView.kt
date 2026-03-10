@@ -40,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.BuildConfig.DEBUG
+import org.readium.r2.navigator.pager.R2ViewPager
 import org.readium.r2.shared.InternalReadiumApi
 import timber.log.Timber
 
@@ -51,6 +52,17 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
 
     init {
         initWebPager()
+    }
+
+    @OptIn(InternalReadiumApi::class)
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // Sync swipe state from the parent R2ViewPager (handles newly-created WebViews).
+        var p = parent
+        while (p != null) {
+            if (p is R2ViewPager) { swipeEnabled = p.isSwipeEnabled; break }
+            p = (p as? android.view.View)?.parent
+        }
     }
 
     private val uiScope = CoroutineScope(Dispatchers.Main)
@@ -132,6 +144,16 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
     private val mLastOffset = java.lang.Float.MAX_VALUE
 
     private var mIsBeingDragged: Boolean = false
+    private var mBlockedHorizontalDrag: Boolean = false
+
+    /** Mirrors R2ViewPager.isSwipeEnabled. Set automatically when attached; updated by the pager. */
+    internal var swipeEnabled: Boolean = true
+
+    // dispatchTouchEvent-level swipe intercept (fires earlier than onTouchEvent, before WebView native scroll)
+    private var mDispatchStartX = 0f
+    private var mDispatchStartY = 0f
+    private var mDispatchIntercepting = false
+
     private var mGutterSize: Int = 30
     private var mTouchSlop: Int = 0
 
@@ -728,6 +750,44 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         }
     }
 
+    /**
+     * Intercepts touch events BEFORE they reach the WebView native handler and JavaScript.
+     * When swipe is disabled (paginated mode, tap-only), cancels any horizontal drag gesture
+     * early to prevent even the slightest visual movement.
+     */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (!scrollMode && !swipeEnabled) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    mDispatchStartX = ev.x
+                    mDispatchStartY = ev.y
+                    mDispatchIntercepting = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (mDispatchIntercepting) return true
+                    val xDiff = abs(ev.x - mDispatchStartX)
+                    val yDiff = abs(ev.y - mDispatchStartY)
+                    // Use half the touch slop so we cancel much earlier than the scroll threshold
+                    if (xDiff > yDiff && xDiff > mTouchSlop / 2f) {
+                        mDispatchIntercepting = true
+                        // Send cancel so JS and native WebView tear down any pending gesture
+                        val cancel = MotionEvent.obtain(ev)
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        super.dispatchTouchEvent(cancel)
+                        cancel.recycle()
+                        return true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val wasIntercepting = mDispatchIntercepting
+                    mDispatchIntercepting = false
+                    if (wasIntercepting) return true
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (mVelocityTracker == null) {
             mVelocityTracker = VelocityTracker.obtain()
@@ -737,6 +797,7 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         val action = ev.action
         when (action and MotionEvent.ACTION_MASK) {
             MotionEvent.ACTION_DOWN -> {
+                mBlockedHorizontalDrag = false
                 mScroller?.let { scroller ->
                     mHasAbortedScroller = !scroller.isFinished
                     scroller.abortAnimation()
@@ -753,6 +814,9 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // If we already decided to block this horizontal drag, consume silently
+                if (mBlockedHorizontalDrag) return true
+
                 if ((mLastMotionX > (width - mGutterSize)) || (mLastMotionX < mGutterSize)) {
                     requestDisallowInterceptTouchEvent(true)
                     return false
@@ -766,7 +830,18 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val y = ev.safeGetY(pointerIndex)
                     val yDiff = abs(y - mInitialMotionY)
 
-                    if (xDiff > mTouchSlop || (scrollMode && yDiff > mTouchSlop)) {
+                    // Swipe is disabled: block any horizontal drag from reaching the WebView
+                    if (!scrollMode && !swipeEnabled && xDiff > mTouchSlop && xDiff >= yDiff) {
+                        mBlockedHorizontalDrag = true
+                        // Send cancel so the WebView's native scroll cleans up properly
+                        val cancelEvent = MotionEvent.obtain(ev)
+                        cancelEvent.action = MotionEvent.ACTION_CANCEL
+                        super.onTouchEvent(cancelEvent)
+                        cancelEvent.recycle()
+                        return true
+                    }
+
+                    if ((xDiff > mTouchSlop && (scrollMode || swipeEnabled)) || (scrollMode && yDiff > mTouchSlop)) {
                         if (DEBUG) Timber.v("Starting drag!")
                         mIsBeingDragged = true
                         mLastMotionX = if (x - mInitialMotionX > 0) {
@@ -779,7 +854,12 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                 }
             }
 
-            MotionEvent.ACTION_UP -> when {
+            MotionEvent.ACTION_UP -> {
+                if (mBlockedHorizontalDrag) {
+                    mBlockedHorizontalDrag = false
+                    return true
+                }
+                when {
                 mIsBeingDragged -> {
                     mIsBeingDragged = false
                     mHasAbortedScroller = false
@@ -838,11 +918,14 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val velocity = getCurrentXVelocity() ?: 0
                     setCurrentItemInternal(mCurItem, true, velocity)
                 }
-            }
+            }}
 
-            MotionEvent.ACTION_CANCEL -> if (mIsBeingDragged) {
-                mIsBeingDragged = false
-                scrollToItem(mCurItem, true, 0, false)
+            MotionEvent.ACTION_CANCEL -> {
+                mBlockedHorizontalDrag = false
+                if (mIsBeingDragged) {
+                    mIsBeingDragged = false
+                    scrollToItem(mCurItem, true, 0, false)
+                }
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
