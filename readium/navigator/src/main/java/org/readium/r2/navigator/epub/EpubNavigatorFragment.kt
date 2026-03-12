@@ -17,13 +17,19 @@ import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.collection.forEach
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.os.BundleCompat
+import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentFactory
@@ -34,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.withStarted
 import androidx.viewpager.widget.ViewPager
+import androidx.webkit.WebViewClientCompat
 import kotlin.math.ceil
 import kotlin.reflect.KClass
 import kotlinx.coroutines.Job
@@ -54,6 +61,7 @@ import org.readium.r2.navigator.NavigatorFragment
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.R2BasicWebView
+import org.readium.r2.navigator.R2WebView
 import org.readium.r2.navigator.RestorationNotSupportedException
 import org.readium.r2.navigator.SelectableNavigator
 import org.readium.r2.navigator.Selection
@@ -343,6 +351,37 @@ public class EpubNavigatorFragment internal constructor(
     private var _binding: ReadiumNavigatorViewpagerBinding? = null
     private val binding get() = _binding!!
 
+    // ── Seamless cross-chapter scroll ────────────────────────────────────────
+
+    /** True when seamless vertical scroll mode is active (scroll pref + reflowable). */
+    private val isSeamlessMode: Boolean
+        get() = viewModel.isScrollEnabled.value && viewModel.layout == EpubLayout.REFLOWABLE
+
+    /** Outer NestedScrollView used in seamless mode. */
+    private var seamlessScrollView: NestedScrollView? = null
+
+    /** Inner LinearLayout (vertical) that stacks chapter WebViews. */
+    private var seamlessContainer: LinearLayout? = null
+
+    /** Per-chapter R2WebView instances, keyed by reading-order index. */
+    private val seamlessWebViews = mutableMapOf<Int, R2WebView>()
+
+    /** Measured chapter heights in pixels, keyed by reading-order index. */
+    private val seamlessChapterHeightsPx = mutableMapOf<Int, Int>()
+
+    /** Estimated chapter height (3 × screen height) used before measurement. */
+    private val estimatedChapterHeightPx: Int
+        get() = resources.displayMetrics.heightPixels * 3
+
+    /** Reading-order index of the chapter at the current scroll position. */
+    private var seamlessCurrentChapterIndex: Int = 0
+
+    /** Y offset to the start of chapter at [index] in the seamless container (px). */
+    private fun yOffsetForSeamlessChapter(index: Int): Int =
+        (0 until index).sumOf { seamlessChapterHeightsPx[it] ?: estimatedChapterHeightPx }
+
+    // ── end seamless fields ───────────────────────────────────────────────────
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -425,12 +464,21 @@ public class EpubNavigatorFragment internal constructor(
     }
 
     private fun resetResourcePager() {
-        val parent = requireNotNull(resourcePager.parent as? ConstraintLayout) {
-            "The parent view of the EPUB `resourcePager` must be a ConstraintLayout"
+        if (isSeamlessMode) {
+            buildSeamlessScrollContainer()
+            return
+        }
+
+        // The parent ConstraintLayout. Use the binding root since the pager may have been detached
+        // (e.g. when switching from seamless back to paged mode).
+        val parent = requireNotNull(binding.root as? ConstraintLayout) {
+            "The root view of the EPUB navigator must be a ConstraintLayout"
         }
         // We need to null out the adapter explicitly, otherwise the page fragments will leak.
-        resourcePager.adapter = null
-        parent.removeView(resourcePager)
+        if (::resourcePager.isInitialized) {
+            resourcePager.adapter = null
+            resourcePager.parent?.let { parent.removeView(resourcePager) }
+        }
 
         resourcePager = R2ViewPager(requireContext())
         resourcePager.offscreenPageLimit = 3
@@ -453,14 +501,34 @@ public class EpubNavigatorFragment internal constructor(
         // Paginated mode (horizontal paging within chapter) = horizontal orientation for chapter navigation
         resourcePager.setHorizontal(!isScrollEnabled)
 
-        // Observe scroll mode changes and update flag + orientation
+        // Observe scroll mode changes and update orientation / rebuild container.
+        // Skip the initial emission if the seamless container was already built by
+        // resetResourcePager() to avoid a double-build on startup.
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isScrollEnabled
                 .flowWithLifecycle(viewLifecycleOwner.lifecycle)
                 .collectLatest { scrollEnabled ->
-                    //resourcePager.isScrollModeEnabled = scrollEnabled
-                    resourcePager.setHorizontal(!scrollEnabled)
-                    Timber.d("ViewPager scroll mode: $scrollEnabled, horizontal: ${!scrollEnabled}")
+                    if (scrollEnabled && viewModel.layout == EpubLayout.REFLOWABLE) {
+                        // Only rebuild if there is no active seamless container
+                        // (e.g. when scroll mode is toggled on after the initial load).
+                        if (seamlessScrollView == null) {
+                            buildSeamlessScrollContainer()
+                        }
+                    } else {
+                        // Switching away from seamless mode: tear down the container.
+                        if (seamlessScrollView != null) {
+                            seamlessScrollView?.let { sv ->
+                                sv.parent?.let { (it as? ViewGroup)?.removeView(sv) }
+                            }
+                            seamlessWebViews.values.forEach { it.destroy() }
+                            seamlessScrollView = null
+                            seamlessContainer = null
+                            seamlessWebViews.clear()
+                            seamlessChapterHeightsPx.clear()
+                        }
+                        resourcePager.setHorizontal(!scrollEnabled)
+                    }
+                    Timber.d("ViewPager scroll mode: $scrollEnabled, seamless: ${seamlessScrollView != null}")
                 }
         }
 
@@ -521,6 +589,198 @@ public class EpubNavigatorFragment internal constructor(
             ReadingProgression.LTR -> LayoutDirection.LTR
         }
     }
+
+    // ── Seamless scroll implementation ───────────────────────────────────────
+
+    /**
+     * Builds a NestedScrollView + LinearLayout container and loads every chapter
+     * as an R2WebView with inner scroll disabled.
+     */
+    private fun buildSeamlessScrollContainer() {
+        // Remove old seamless container if rebuilding.
+        seamlessScrollView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+        seamlessWebViews.values.forEach { it.destroy() }
+        seamlessWebViews.clear()
+        seamlessChapterHeightsPx.clear()
+
+        // Remove ViewPager from parent (may already be there).
+        val parent = binding.root as? ConstraintLayout ?: return
+        if (::resourcePager.isInitialized) {
+            resourcePager.adapter = null
+            resourcePager.parent?.let { parent.removeView(resourcePager) }
+        }
+
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+        }
+
+        val scrollView = NestedScrollView(requireContext()).apply {
+            id = View.generateViewId()
+            layoutParams = ConstraintLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+            isVerticalScrollBarEnabled = false
+            isFillViewport = true
+        }
+        scrollView.addView(container)
+        parent.addView(scrollView)
+
+        seamlessContainer = container
+        seamlessScrollView = scrollView
+
+        // Track current chapter as user scrolls.
+        scrollView.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, _ ->
+            updateSeamlessCurrentChapter(scrollY)
+            debounceLocationNotificationJob?.cancel()
+            debounceLocationNotificationJob = viewLifecycleOwner.lifecycleScope.launch {
+                delay(100L)
+                notifySeamlessLocation()
+            }
+        })
+
+        // Load all chapters.
+        for (index in readingOrder.indices) {
+            loadChapterSeamless(index)
+        }
+    }
+
+    /** Creates and adds an R2WebView for the chapter at [index]. */
+    @Suppress("SetJavaScriptEnabled")
+    private fun loadChapterSeamless(index: Int) {
+        val link = readingOrder[index]
+        val url = viewModel.urlTo(link)
+
+        // Inflate the layout so R2WebView is created with the correct XML AttributeSet.
+        val inflater = LayoutInflater.from(requireContext())
+        val chapterBinding = org.readium.r2.navigator.databinding
+            .ReadiumNavigatorViewpagerFragmentEpubBinding.inflate(inflater, null, false)
+        val webView = chapterBinding.webView
+
+        // Core setup mirroring R2EpubPageFragment.
+        webViewListener.let { listener ->
+            webView.listener = listener
+            for ((name, obj) in listener.javascriptInterfacesForResource(link)) {
+                if (obj != null) webView.addJavascriptInterface(obj, name)
+            }
+        }
+        webView.settings.javaScriptEnabled = true
+        webView.isVerticalScrollBarEnabled = false
+        webView.isHorizontalScrollBarEnabled = false
+        webView.settings.useWideViewPort = true
+        webView.settings.loadWithOverviewMode = true
+        webView.settings.setSupportZoom(false)
+        webView.overScrollMode = View.OVER_SCROLL_NEVER
+        webView.resourceUrl = url
+        webView.addJavascriptInterface(webView, "Android")
+
+        // Disable inner vertical scrolling — outer NestedScrollView handles it.
+        webView.isVerticalScrollBarEnabled = false
+        webView.isNestedScrollingEnabled = false
+
+        webView.webViewClient = object : WebViewClientCompat() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                webView.shouldOverrideUrlLoading(request)
+
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                webView.shouldInterceptRequest(view, request)
+
+            override fun onPageFinished(view: WebView, pageUrl: String) {
+                super.onPageFinished(view, pageUrl)
+                webViewListener.onResourceLoaded(webView, link)
+
+                // Measure content height and resize the WebView slot.
+                view.evaluateJavascript("document.documentElement.scrollHeight") { heightStr ->
+                    val heightDp = heightStr?.toFloatOrNull() ?: return@evaluateJavascript
+                    val density = resources.displayMetrics.density
+                    val heightPx = (heightDp * density).toInt()
+                    updateSeamlessChapterHeight(index, heightPx)
+                    webViewListener.onPageLoaded(webView, link)
+                }
+            }
+        }
+
+        // The inflated binding attaches webView to a CoordinatorLayout root;
+        // detach it first so it can be re-parented into the LinearLayout.
+        (webView.parent as? ViewGroup)?.removeView(webView)
+
+        // Placeholder height until content is measured.
+        val lp = LinearLayout.LayoutParams(MATCH_PARENT, estimatedChapterHeightPx)
+        seamlessContainer?.addView(webView, lp)
+        seamlessWebViews[index] = webView
+
+        webView.loadUrl(url.toString())
+    }
+
+    /** Updates the stored height and layout params for chapter [index]. */
+    private fun updateSeamlessChapterHeight(index: Int, heightPx: Int) {
+        if (heightPx <= 0) return
+        val old = seamlessChapterHeightsPx[index] ?: estimatedChapterHeightPx
+        seamlessChapterHeightsPx[index] = heightPx
+        val webView = seamlessWebViews[index] ?: return
+        (webView.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
+            lp.height = heightPx
+            webView.layoutParams = lp
+        }
+        // Compensate scroll offset if the updated chapter precedes the current position.
+        if (index < seamlessCurrentChapterIndex) {
+            seamlessScrollView?.let { sv ->
+                sv.scrollTo(0, sv.scrollY + (heightPx - old))
+            }
+        }
+    }
+
+    /** Determines which chapter is visible based on the current scroll offset. */
+    private fun updateSeamlessCurrentChapter(scrollY: Int) {
+        val midY = scrollY + (seamlessScrollView?.height ?: 0) / 2
+        var accumulated = 0
+        var newIndex = maxOf(0, readingOrder.size - 1)
+        for (i in readingOrder.indices) {
+            accumulated += seamlessChapterHeightsPx[i] ?: estimatedChapterHeightPx
+            if (midY < accumulated) {
+                newIndex = i
+                break
+            }
+        }
+        seamlessCurrentChapterIndex = newIndex
+    }
+
+    /** Scrolls the outer NestedScrollView by one screen step. */
+    private fun seamlessScrollByPage(direction: Int, animated: Boolean): Boolean {
+        val sv = seamlessScrollView ?: return false
+        val step = (sv.height * 0.8f).toInt()
+        val maxScrollY = seamlessContainer?.height?.minus(sv.height) ?: 0
+        val targetY = (sv.scrollY + direction * step).coerceIn(0, maxOf(0, maxScrollY))
+        if (targetY == sv.scrollY) return false
+        if (animated) sv.smoothScrollTo(0, targetY) else sv.scrollTo(0, targetY)
+        return true
+    }
+
+    /** Notifies the current location based on seamless scroll position. */
+    private fun notifySeamlessLocation() {
+        val sv = seamlessScrollView ?: return
+        val index = seamlessCurrentChapterIndex
+        val link = readingOrder.getOrNull(index) ?: return
+        val chapterTopY = yOffsetForSeamlessChapter(index)
+        val chapterHeightPx = seamlessChapterHeightsPx[index]?.takeIf { it > 0 }
+            ?: estimatedChapterHeightPx
+        val progression = ((sv.scrollY - chapterTopY).toFloat() / chapterHeightPx)
+            .coerceIn(0f, 1f).toDouble()
+
+        val positionLocator = publication.positionsByResource[link.url()]?.let { positions ->
+            val posIndex = ceil(progression * (positions.size - 1)).toInt()
+            positions.getOrNull(posIndex)
+        }
+
+        val locator = Locator(
+            href = link.url(),
+            mediaType = link.mediaType ?: MediaType.XHTML,
+            title = tableOfContentsTitleByHref[link.href] ?: positionLocator?.title ?: link.title,
+            locations = (positionLocator?.locations ?: Locator.Locations()).copy(progression = progression),
+            text = positionLocator?.text ?: Locator.Text()
+        )
+        _currentLocator.value = locator
+    }
+
+    // ── end seamless implementation ───────────────────────────────────────────
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -635,6 +895,24 @@ public class EpubNavigatorFragment internal constructor(
         }
 
         listener?.onJumpToLocator(locator)
+
+        // In seamless mode, scroll to the chapter's Y position.
+        if (isSeamlessMode) {
+            val href = locator.href.removeFragment()
+            val index = readingOrder.indexOfFirst { it.url().isEquivalent(href) }
+            if (index >= 0) {
+                val progression = locator.locations.progression ?: 0.0
+                val chapterTopY = yOffsetForSeamlessChapter(index)
+                val chapterHeightPx = seamlessChapterHeightsPx[index]?.takeIf { it > 0 }
+                    ?: estimatedChapterHeightPx
+                val targetY = chapterTopY + (progression * chapterHeightPx).toInt()
+                if (animated) seamlessScrollView?.smoothScrollTo(0, targetY)
+                else seamlessScrollView?.scrollTo(0, targetY)
+                seamlessCurrentChapterIndex = index
+                _currentLocator.value = locator
+            }
+            return index >= 0
+        }
 
         val href = locator.href.removeFragment()
 
@@ -925,6 +1203,8 @@ public class EpubNavigatorFragment internal constructor(
     }
 
     override fun goForward(animated: Boolean): Boolean {
+        if (isSeamlessMode) return seamlessScrollByPage(1, animated)
+
         if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
             return goToNextResource(jump = false, animated = animated)
         }
@@ -942,6 +1222,8 @@ public class EpubNavigatorFragment internal constructor(
     }
 
     override fun goBackward(animated: Boolean): Boolean {
+        if (isSeamlessMode) return seamlessScrollByPage(-1, animated)
+
         if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
             return goToPreviousResource(jump = false, animated = animated)
         }
@@ -1107,6 +1389,9 @@ public class EpubNavigatorFragment internal constructor(
     }
 
     private fun notifyCurrentLocation() {
+        // In seamless mode location is tracked via the scroll change listener.
+        if (isSeamlessMode) return
+
         // Make sure viewLifecycleOwner is accessible.
         view ?: return
 
