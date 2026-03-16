@@ -869,20 +869,32 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     val y = ev.safeGetY(activePointerIndex)
 
                     if (scrollMode) {
-                        val totalVerticalDelta = (x - mInitialMotionX).toInt()
+                        val totalHorizontalDelta = (x - mInitialMotionX).toInt()
 
                         // Vertical swipe for chapter navigation in scroll mode
                         // Only trigger vertical navigation if horizontal movement is small
-                        if (abs(totalVerticalDelta) < 300) {
-                            if (mInitialVerticalOverscroll == VerticalOverscrollMode.BOTH) {
+                        // Re-check overscroll at release time for more reliable boundary detection
+                        if (abs(totalHorizontalDelta) < 300) {
+                            val currentVerticalOverscroll = getVerticalOverscrollMode()
+                            val isAtTop = mInitialVerticalOverscroll == VerticalOverscrollMode.TOP ||
+                                mInitialVerticalOverscroll == VerticalOverscrollMode.BOTH ||
+                                currentVerticalOverscroll == VerticalOverscrollMode.TOP ||
+                                currentVerticalOverscroll == VerticalOverscrollMode.BOTH
+                            val isAtBottom = mInitialVerticalOverscroll == VerticalOverscrollMode.BOTTOM ||
+                                mInitialVerticalOverscroll == VerticalOverscrollMode.BOTH ||
+                                currentVerticalOverscroll == VerticalOverscrollMode.BOTTOM ||
+                                currentVerticalOverscroll == VerticalOverscrollMode.BOTH
+
+                            if (isAtTop && isAtBottom) {
+                                // Content fits in one screen - allow both directions
                                 if (mInitialMotionY < y) {
                                     scrollUp()
                                 } else if (mInitialMotionY > y) {
                                     scrollDown()
                                 }
-                            } else if (mInitialMotionY < y && mInitialVerticalOverscroll == VerticalOverscrollMode.TOP) {
+                            } else if (mInitialMotionY < y && isAtTop) {
                                 scrollUp()
-                            } else if (mInitialMotionY > y && mInitialVerticalOverscroll == VerticalOverscrollMode.BOTTOM) {
+                            } else if (mInitialMotionY > y && isAtBottom) {
                                 scrollDown()
                             }
                         }
@@ -1220,7 +1232,11 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
         }
 
         val atTop = scrollY <= 0
-        val atBottom = !canScrollVertically(1)
+        // Use tolerance for bottom detection to handle sub-pixel imprecision
+        val contentHeight = computeVerticalScrollRange()
+        val viewHeight = computeVerticalScrollExtent()
+        val tolerance = (viewHeight * 0.02).toInt().coerceAtLeast(5)
+        val atBottom = scrollY + viewHeight >= contentHeight - tolerance
 
         if (atTop && atBottom) {
             return VerticalOverscrollMode.BOTH
@@ -1234,11 +1250,18 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
     }
 
     internal val numPages: Int
-        get() =
+        get() = if (scrollMode) {
+            computeVerticalScrollExtent()
+                .takeIf { it > 0 }
+                ?.let { clientHeight -> (computeVerticalScrollRange() / clientHeight.toDouble()).roundToInt() }
+                ?.coerceAtLeast(1)
+                ?: 1
+        } else {
             getClientWidth()
                 ?.let { clientWidth -> (computeHorizontalScrollRange() / clientWidth.toDouble()).roundToInt() }
                 ?.coerceAtLeast(1)
                 ?: 1
+        }
 
     enum class OverscrollMode {
         NONE,

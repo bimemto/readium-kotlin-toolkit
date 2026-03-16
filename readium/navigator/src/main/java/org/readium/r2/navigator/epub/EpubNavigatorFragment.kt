@@ -1155,12 +1155,20 @@ public class EpubNavigatorFragment internal constructor(
                 positions.getOrNull(index)
             }
 
+            val pageCount = reflowableWebView?.numPages ?: 0
+            val baseLocations = positionLocator?.locations ?: Locator.Locations()
+            val otherWithPageCount = if (pageCount > 0) {
+                baseLocations.otherLocations + ("pageCount" to pageCount)
+            } else {
+                baseLocations.otherLocations
+            }
             val currentLocator = Locator(
                 href = link.url(),
                 mediaType = link.mediaType ?: MediaType.XHTML,
                 title = tableOfContentsTitleByHref[link.href] ?: positionLocator?.title ?: link.title,
-                locations = (positionLocator?.locations ?: Locator.Locations()).copy(
-                    progression = progression
+                locations = baseLocations.copy(
+                    progression = progression,
+                    otherLocations = otherWithPageCount
                 ),
                 text = positionLocator?.text ?: Locator.Text()
             )
