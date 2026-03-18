@@ -1156,9 +1156,11 @@ public class EpubNavigatorFragment internal constructor(
             }
 
             val pageCount = reflowableWebView?.numPages ?: 0
+            val curItem = reflowableWebView?.mCurItem ?: 0
             val baseLocations = positionLocator?.locations ?: Locator.Locations()
             val otherWithPageCount = if (pageCount > 0) {
-                baseLocations.otherLocations + ("pageCount" to pageCount)
+                val pageEndProgression = minOf((curItem + 1.0) / pageCount, 1.0)
+                baseLocations.otherLocations + ("pageCount" to pageCount) + ("pageEndProgression" to pageEndProgression)
             } else {
                 baseLocations.otherLocations
             }
