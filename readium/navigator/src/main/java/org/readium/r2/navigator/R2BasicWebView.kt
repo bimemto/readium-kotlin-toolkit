@@ -64,11 +64,6 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
         /** Called when the target page of the resource is loaded in the web view. */
         fun onPageLoaded(webView: R2BasicWebView, link: Link) {}
 
-        /**
-         * Called when the loaded chapter content is an XML/parsing error page (e.g. malformed XHTML).
-         * The WebView may have already been replaced with a blank page; the app should show a toast.
-         */
-        fun onChapterContentError(link: Link) {}
         fun onPageChanged(pageIndex: Int, totalPages: Int, url: String) {}
         fun onPageEnded(end: Boolean) {}
         fun onTap(point: PointF): Boolean = false
