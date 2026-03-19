@@ -48,6 +48,14 @@ export function nearestInteractiveElement(element) {
 
 export function findFirstVisibleLocator() {
   const element = findElement(document.body);
+
+  // Get text actually visible at the top of the viewport
+  // instead of full textContent of the nearest block element
+  var visibleText = getVisibleTextAtViewportTop();
+  if (!visibleText) {
+    visibleText = element.textContent;
+  }
+
   return {
     href: "#",
     type: "application/xhtml+xml",
@@ -55,9 +63,62 @@ export function findFirstVisibleLocator() {
       cssSelector: getCssSelector(element),
     },
     text: {
-      highlight: element.textContent,
+      highlight: visibleText,
     },
   };
+}
+
+/**
+ * Get text visible at the top of the viewport using caretRangeFromPoint.
+ * Returns the first ~100 chars of visible text starting from the exact
+ * viewport top position, not from the beginning of the paragraph.
+ */
+function getVisibleTextAtViewportTop() {
+  // Scan from top of viewport downward to find actual text
+  for (var y = 0; y < window.innerHeight * 0.3; y += 5) {
+    // First probe at center to check if this y has text
+    var centerRange = document.caretRangeFromPoint(window.innerWidth / 2, y);
+    if (!centerRange || !centerRange.startContainer) continue;
+    if (centerRange.startContainer.nodeType !== Node.TEXT_NODE) continue;
+    if (!centerRange.startContainer.textContent || !centerRange.startContainer.textContent.trim()) continue;
+
+    // Found a line with text — now probe from left edge to get start of line
+    var range = null;
+    for (var x = 1; x < window.innerWidth / 2; x += 5) {
+      var r = document.caretRangeFromPoint(x, y);
+      if (r && r.startContainer && r.startContainer.nodeType === Node.TEXT_NODE &&
+          r.startContainer.textContent && r.startContainer.textContent.trim()) {
+        range = r;
+        break;
+      }
+    }
+    if (!range) range = centerRange;
+
+    var node = range.startContainer;
+    // Get text from the exact caret position (not from start of paragraph)
+    var text = node.textContent.substring(range.startOffset).trim();
+
+    // Collect more text from subsequent text nodes if needed
+    if (text.length < 100) {
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      var foundCurrent = false;
+      while (walker.nextNode()) {
+        if (walker.currentNode === node) {
+          foundCurrent = true;
+          continue;
+        }
+        if (foundCurrent && walker.currentNode.textContent.trim()) {
+          text += ' ' + walker.currentNode.textContent.trim();
+          if (text.length >= 100) break;
+        }
+      }
+    }
+
+    text = text.trim();
+    if (text) return text;
+  }
+
+  return null;
 }
 
 function findElement(rootElement) {
