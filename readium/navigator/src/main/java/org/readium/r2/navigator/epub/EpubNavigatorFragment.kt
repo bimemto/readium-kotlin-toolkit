@@ -817,6 +817,9 @@ public class EpubNavigatorFragment internal constructor(
                 state = State.Ready
             }
 
+            // Inject JS to track which TOC fragment is at the top of the viewport
+            injectTocFragmentTracker(webView, link)
+
             notifyCurrentLocation()
         }
 
@@ -1093,6 +1096,76 @@ public class EpubNavigatorFragment internal constructor(
     private var debounceLocationNotificationJob: Job? = null
 
     /**
+     * Mapping between reading order base hrefs (url string, no fragment) and their TOC fragment IDs.
+     * Used to inject JS that tracks which sub-chapter is currently visible.
+     */
+    private val tocFragmentsByHref: Map<String, List<String>> by lazy {
+        val map = mutableMapOf<String, MutableList<String>>()
+        fun collect(links: List<Link>) {
+            for (link in links) {
+                val full = link.url().toString()
+                if (full.contains("#")) {
+                    val base = full.substringBefore("#")
+                    val frag = full.substringAfter("#")
+                    map.getOrPut(base) { mutableListOf() }.add(frag)
+                }
+                collect(link.children)
+            }
+        }
+        collect(publication.tableOfContents)
+        map
+    }
+
+    /**
+     * Mapping between TOC url strings (including fragments) and their titles.
+     * Used to resolve sub-chapter titles when a TOC fragment is active.
+     */
+    private val tocTitleByUrlString: Map<String, String> by lazy {
+        val map = mutableMapOf<String, String>()
+        fun collect(links: List<Link>) {
+            for (link in links) {
+                val title = link.title
+                if (!title.isNullOrEmpty()) {
+                    map.putIfAbsent(link.url().toString(), title)
+                }
+                collect(link.children)
+            }
+        }
+        collect(publication.tableOfContents)
+        map
+    }
+
+    /** Inject a function that finds which TOC fragment anchor is at the top of the viewport. */
+    private fun injectTocFragmentTracker(webView: R2BasicWebView, link: Link) {
+        val baseHref = link.url().toString().substringBefore("#")
+        val fragments = tocFragmentsByHref[baseHref]
+        Log.d("EpubNavigator", "::injectTocFragmentTracker baseHref=$baseHref, fragments=$fragments, tocFragmentsByHref keys=${tocFragmentsByHref.keys}")
+        if (fragments.isNullOrEmpty()) return
+
+        val fragsJson = fragments.joinToString(",") { "\"${it.replace("\"", "\\\"")}\"" }
+        val script = """
+            (function() {
+                var frags = [$fragsJson];
+                window.__getTocFragment = function() {
+                    var best = '';
+                    var vw = window.innerWidth;
+                    var vh = window.innerHeight;
+                    for (var i = 0; i < frags.length; i++) {
+                        var el = document.getElementById(frags[i]);
+                        if (!el) continue;
+                        var r = el.getBoundingClientRect();
+                        // In paginated mode (CSS columns): element is on or before current page
+                        // In scroll mode: element is at or above viewport top
+                        if (r.top < vh && r.left < vw) best = frags[i];
+                    }
+                    return best;
+                };
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(script, null)
+    }
+
+    /**
      * Mapping between reading order hrefs and the table of contents title.
      */
     private val tableOfContentsTitleByHref: Map<Href, String> by lazy {
@@ -1164,10 +1237,44 @@ public class EpubNavigatorFragment internal constructor(
             } else {
                 baseLocations.otherLocations
             }
+            // Read the current TOC fragment by calling the injected function on-demand
+            // (works in both paginated and scroll modes)
+            val tocFragment = reflowableWebView?.let { wv ->
+                kotlinx.coroutines.suspendCancellableCoroutine<String> { cont ->
+                    wv.evaluateJavascript("(typeof window.__getTocFragment === 'function') ? window.__getTocFragment() : ''") { result ->
+                        // Result is JSON-encoded, e.g. "\"section1\"" or "\"\""
+                        val cleaned = result?.trim()?.removeSurrounding("\"") ?: ""
+                        cont.resumeWith(Result.success(cleaned))
+                    }
+                }
+            } ?: ""
+
+            // Build href with fragment if a TOC sub-section is visible
+            val locatorHref = if (tocFragment.isNotEmpty()) {
+                val baseUrl = link.url().toString()
+                val urlWithFrag = "$baseUrl#$tocFragment"
+                val constructed = Url(urlWithFrag)
+                Log.d("EpubNavigator", "::notifyCurrentLocation tocFragment='$tocFragment', constructedUrl=${constructed}, urlString='$urlWithFrag'")
+                constructed ?: link.url()
+            } else {
+                link.url()
+            }
+
+            // Resolve title: prefer sub-chapter title from TOC when fragment is active
+            val resolvedTitle = if (tocFragment.isNotEmpty()) {
+                val urlWithFragment = "${link.url()}#$tocFragment"
+                tocTitleByUrlString[urlWithFragment]
+                    ?: tableOfContentsTitleByHref[link.href]
+                    ?: positionLocator?.title
+                    ?: link.title
+            } else {
+                tableOfContentsTitleByHref[link.href] ?: positionLocator?.title ?: link.title
+            }
+
             val currentLocator = Locator(
-                href = link.url(),
+                href = locatorHref,
                 mediaType = link.mediaType ?: MediaType.XHTML,
-                title = tableOfContentsTitleByHref[link.href] ?: positionLocator?.title ?: link.title,
+                title = resolvedTitle,
                 locations = baseLocations.copy(
                     progression = progression,
                     otherLocations = otherWithPageCount
@@ -1175,7 +1282,7 @@ public class EpubNavigatorFragment internal constructor(
                 text = positionLocator?.text ?: Locator.Text()
             )
 
-            Log.d("EpubNavigator", "::notifyCurrentLocation CREATED LOCATOR: href=${currentLocator.href}, progression=${currentLocator.locations.progression}, totalProgression=${currentLocator.locations.totalProgression}")
+            Log.d("EpubNavigator", "::notifyCurrentLocation CREATED LOCATOR: href=${currentLocator.href}, title=${currentLocator.title}, progression=${currentLocator.locations.progression}, totalProgression=${currentLocator.locations.totalProgression}")
 
             _currentLocator.value = currentLocator
 
