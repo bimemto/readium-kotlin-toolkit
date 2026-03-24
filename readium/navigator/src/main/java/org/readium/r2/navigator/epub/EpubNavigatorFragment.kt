@@ -1027,6 +1027,14 @@ public class EpubNavigatorFragment internal constructor(
     private val currentReflowablePageFragment: R2EpubPageFragment? get() =
         currentFragment as? R2EpubPageFragment
 
+    /**
+     * WebView for the currently visible reflowable page. Used to map selection/highlight rects
+     * (viewport space, physical px from JS) to window coordinates. Prefer over scanning the view
+     * hierarchy, which may pick a non-current page in the ViewPager.
+     */
+    public fun activeWebViewForHighlight(): WebView? =
+        currentReflowablePageFragment?.webView
+
     private val currentFragment: Fragment? get() =
         fragmentAt(resourcePager.currentItem)
 
