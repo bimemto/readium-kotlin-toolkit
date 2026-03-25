@@ -13,6 +13,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Build
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.util.Log
 import android.view.*
@@ -129,8 +130,15 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
 
     internal val scrollModeFlow = MutableStateFlow(false)
 
-    /** Indicates that a user text selection is active. */
+    /** Indicates that a user text selection is active. Written from JS thread, read from UI thread. */
+    @Volatile
     internal var isSelecting = false
+
+    /** Timestamp (uptimeMillis) when isSelecting was last set to false. Used as a cooldown to
+     *  prevent drag detection from activating during brief race-condition windows where the JS
+     *  selectionchange event spuriously collapses the selection during handle drag. */
+    @Volatile
+    internal var lastSelectionActiveTime: Long = 0L
 
     val scrollMode: Boolean get() = scrollModeFlow.value
     var disablePageTurnsWhileScrolling: Boolean = false
@@ -221,8 +229,33 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
     }
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+        // In paginated mode (CSS columns), block horizontal scroll during text selection.
+        // The Android WebView auto-scrolls to follow selection handles, which shifts
+        // CSS columns and causes the selection to flicker across column boundaries.
+        if (isSelecting && !scrollMode && l != oldl) {
+            scrollTo(oldl, t)
+            return
+        }
         super.onScrollChanged(l, t, oldl, oldt)
         listener?.onProgressionChanged()
+    }
+
+    override fun scrollTo(x: Int, y: Int) {
+        // Block horizontal scroll during text selection in paginated mode.
+        if (isSelecting && !scrollMode) {
+            super.scrollTo(scrollX, y) // Keep current horizontal position, allow vertical
+            return
+        }
+        super.scrollTo(x, y)
+    }
+
+    override fun scrollBy(x: Int, y: Int) {
+        // Block horizontal scroll during text selection in paginated mode.
+        if (isSelecting && !scrollMode && x != 0) {
+            super.scrollBy(0, y)
+            return
+        }
+        super.scrollBy(x, y)
     }
 
     override fun destroy() {
@@ -460,6 +493,7 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
 
     @android.webkit.JavascriptInterface
     fun onSelectionEnd() {
+        lastSelectionActiveTime = SystemClock.uptimeMillis()
         isSelecting = false
     }
 
@@ -506,12 +540,12 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
 
     @android.webkit.JavascriptInterface
     fun logError(message: String, filename: String, line: Int) {
-        Timber.e("JavaScript error: $filename:$line $message")
+        Log.e("ReadiumJS", "error: $filename:$line $message")
     }
 
     @android.webkit.JavascriptInterface
     fun log(message: String) {
-        Timber.d("JavaScript: $message")
+        Log.d("ReadiumJS", message)
     }
 
     fun Boolean.toInt() = if (this) 1 else 0

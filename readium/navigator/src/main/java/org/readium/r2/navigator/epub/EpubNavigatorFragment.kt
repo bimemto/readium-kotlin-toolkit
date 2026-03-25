@@ -54,6 +54,7 @@ import org.readium.r2.navigator.NavigatorFragment
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.R2BasicWebView
+import org.readium.r2.navigator.R2WebView
 import org.readium.r2.navigator.RestorationNotSupportedException
 import org.readium.r2.navigator.SelectableNavigator
 import org.readium.r2.navigator.Selection
@@ -343,6 +344,75 @@ public class EpubNavigatorFragment internal constructor(
     private var _binding: ReadiumNavigatorViewpagerBinding? = null
     private val binding get() = _binding!!
 
+    // WebView pool to avoid re-creating WebViews from scratch on chapter jumps
+    private val webViewPool = mutableListOf<R2WebView>()
+    private val maxWebViewPoolSize = 1
+
+    /**
+     * Acquire a pre-initialized WebView from the pool, or null if pool is empty.
+     * Detaches the WebView from any existing parent before returning it.
+     */
+    internal fun acquireWebView(): R2WebView? {
+        val wv = webViewPool.removeLastOrNull() ?: return null
+        // Detach from previous parent if still attached
+        (wv.parent as? ViewGroup)?.removeView(wv)
+        return wv
+    }
+
+    /**
+     * Return a WebView to the pool for reuse, or destroy it if pool is full.
+     * Does NOT remove from parent here — that causes re-layout during fragment
+     * destruction which triggers a ViewPager re-entrancy crash.
+     */
+    internal fun releaseWebView(webView: R2WebView) {
+        if (webViewPool.size >= maxWebViewPoolSize) {
+            // Pool full — schedule destruction after layout pass completes
+            webView.post {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                webView.removeAllViews()
+                webView.destroy()
+            }
+            return
+        }
+        webView.stopLoading()
+        webView.loadDataWithBaseURL(null, "", "text/html", "utf-8", null)
+        webView.listener = null
+        webView.resourceUrl = null
+        webViewPool.add(webView)
+    }
+
+    private fun prewarmWebViewPool() {
+        if (webViewPool.isEmpty()) {
+            try {
+                // Inflate an R2WebView from the same XML layout to get proper AttributeSet
+                val inflater = LayoutInflater.from(requireContext())
+                val wv = inflater.inflate(
+                    R.layout.readium_navigator_viewpager_fragment_epub, null, false
+                ).findViewById<R2WebView>(R.id.webView)
+                wv.settings.javaScriptEnabled = true
+                wv.isVerticalScrollBarEnabled = false
+                wv.isHorizontalScrollBarEnabled = false
+                wv.settings.useWideViewPort = true
+                wv.settings.loadWithOverviewMode = true
+                wv.settings.setSupportZoom(true)
+                wv.settings.builtInZoomControls = true
+                wv.settings.displayZoomControls = false
+                webViewPool.add(wv)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to prewarm WebView pool")
+            }
+        }
+    }
+
+    private fun destroyWebViewPool() {
+        webViewPool.forEach { wv ->
+            (wv.parent as? ViewGroup)?.removeView(wv)
+            wv.removeAllViews()
+            wv.destroy()
+        }
+        webViewPool.clear()
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -416,12 +486,20 @@ public class EpubNavigatorFragment internal constructor(
         resourcePager = binding.resourcePager
         resetResourcePager()
 
+        // Pre-create a spare WebView for faster chapter jumps
+        prewarmWebViewPool()
+
         // Fixed layout publications cannot intercept JS events yet.
         if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
             view = KeyInterceptorView(view, inputListener)
         }
 
         return view
+    }
+
+    override fun onDestroyView() {
+        destroyWebViewPool()
+        super.onDestroyView()
     }
 
     private fun resetResourcePager() {
@@ -653,7 +731,30 @@ public class EpubNavigatorFragment internal constructor(
             val (index, _) = page
 
             if (resourcePager.currentItem != index) {
+                val isDistantJump = Math.abs(resourcePager.currentItem - index) > resourcePager.offscreenPageLimit
+                if (isDistantJump) {
+                    // Temporarily reduce offscreenPageLimit so only the target chapter
+                    // loads first, instead of 7 chapters competing for CPU.
+                    resourcePager.offscreenPageLimit = 1
+                }
                 resourcePager.currentItem = index
+                if (isDistantJump) {
+                    // Restore offscreenPageLimit after target chapter finishes loading.
+                    // Use a coroutine to wait for the page fragment to load.
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        // Wait for the adapter to create the fragment and for it to load
+                        var attempts = 0
+                        while (attempts < 50) { // max 5 seconds
+                            val fragment = r2PagerAdapter?.getCurrentFragment() as? R2EpubPageFragment
+                            if (fragment != null && fragment.isLoaded.value) {
+                                break
+                            }
+                            delay(100)
+                            attempts++
+                        }
+                        resourcePager.offscreenPageLimit = 3
+                    }
+                }
             }
             r2PagerAdapter?.loadLocatorAt(index, locator)
         }

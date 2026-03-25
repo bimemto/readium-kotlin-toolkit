@@ -36,6 +36,7 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import android.util.Log
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.R2BasicWebView
 import org.readium.r2.navigator.R2WebView
@@ -77,6 +78,8 @@ internal class R2EpubPageFragment : Fragment() {
 
     private var isLoading: Boolean = false
     private val _isLoaded = MutableStateFlow(false)
+
+    private var createViewTimestamp = 0L
 
     internal fun setFontSize(fontSize: Double) {
         textZoom = (fontSize * 100).roundToInt()
@@ -139,10 +142,32 @@ internal class R2EpubPageFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
+        createViewTimestamp = System.currentTimeMillis()
+        Log.d("CHAPTERPERF","PERF [${resourceUrl}] onCreateView START")
+
         _binding = ReadiumNavigatorViewpagerFragmentEpubBinding.inflate(inflater, container, false)
         containerView = binding.root
 
-        val webView = binding.webView
+        // Try to acquire a pre-initialized WebView from the pool
+        val pooledWebView = try {
+            navigator?.acquireWebView()
+        } catch (e: Exception) {
+            null
+        }
+
+        val webView: R2WebView
+        if (pooledWebView != null) {
+            // Use pooled WebView: remove the XML-inflated one and insert the pooled one
+            val xmlWebView = binding.webView
+            val layoutParams = xmlWebView.layoutParams
+            val parentView = xmlWebView.parent as? ViewGroup
+            parentView?.removeView(xmlWebView)
+            xmlWebView.destroy()
+            parentView?.addView(pooledWebView, 0, layoutParams)
+            webView = pooledWebView
+        } else {
+            webView = binding.webView
+        }
         this.webView = webView
 
         webView.visibility = View.INVISIBLE
@@ -240,6 +265,7 @@ internal class R2EpubPageFragment : Fragment() {
         }
 
         resourceUrl?.let {
+            Log.d("CHAPTERPERF","PERF [${resourceUrl}] loadUrl START +${System.currentTimeMillis() - createViewTimestamp}ms")
             isLoading = true
             _isLoaded.value = false
             webView.loadUrl(it.toString())
@@ -271,6 +297,7 @@ internal class R2EpubPageFragment : Fragment() {
     }
 
     private fun onPageFinished() {
+        Log.d("CHAPTERPERF","PERF [${resourceUrl}] onPageFinished +${System.currentTimeMillis() - createViewTimestamp}ms")
         isPageFinished = true
         pendingPageFinished.forEach { it() }
         pendingPageFinished.clear()
@@ -307,6 +334,9 @@ internal class R2EpubPageFragment : Fragment() {
 
     override fun onDestroyView() {
         webView?.listener = null
+        // Return WebView to pool instead of letting onDetach destroy it
+        webView?.let { navigator?.releaseWebView(it) }
+        webView = null
         _binding = null
 
         super.onDestroyView()
@@ -315,13 +345,14 @@ internal class R2EpubPageFragment : Fragment() {
     override fun onDetach() {
         super.onDetach()
 
-        // Prevent the web view from leaking when its parent is detached.
-        // See https://stackoverflow.com/a/19391512/1474476
+        // WebView is normally returned to pool in onDestroyView and nulled.
+        // This is a safety net for edge cases where onDestroyView didn't run.
         webView?.let { wv ->
             (wv.parent as? ViewGroup)?.removeView(wv)
             wv.removeAllViews()
             wv.destroy()
         }
+        webView = null
     }
 
     private fun setupPadding() {
@@ -389,10 +420,13 @@ internal class R2EpubPageFragment : Fragment() {
         return tag == currentFragment.tag
     }
 
+
     private fun onLoadPage() {
         if (!isLoading) return
         isLoading = false
         _isLoaded.value = true
+
+        Log.d("CHAPTERPERF","PERF [${resourceUrl}] onLoadPage (content ready) +${System.currentTimeMillis() - createViewTimestamp}ms")
 
         if (view == null) return
 
@@ -414,6 +448,7 @@ internal class R2EpubPageFragment : Fragment() {
                 link?.let {
                     webView.listener?.onPageLoaded(webView, it)
                 }
+
             }
         }
     }

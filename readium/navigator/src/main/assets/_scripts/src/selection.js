@@ -19,17 +19,132 @@ window.addEventListener(
   "load",
   function () {
     var isSelecting = false;
+    var snapTimeout = null;
+    // In paginated mode, the WebView auto-scrolls horizontally to follow the
+    // selection handle. This shifts CSS columns and causes the selection to
+    // flicker between two positions. Lock scrollLeft while selecting.
+    var lockedScrollLeft = null;
+    var selectionRAF = null;
+    // Track the last valid selection range so we can restore it when the
+    // Android WebView glitches across CSS column boundaries (focus jumps
+    // from a #text node to a container element, selecting a huge chunk).
+    var lastValidRange = null;
+    var lastValidTextLen = 0;
+    // When true, selectionchange events are suppressed (used during range restoration
+    // to prevent removeAllRanges/addRange from triggering onSelectionEnd/onSelectionStart).
+    var suppressSelectionChange = false;
+
+    // requestAnimationFrame loop: resets scrollLeft before every paint frame.
+    // This is the only reliable way to prevent the CSS column scroll from
+    // rendering the wrong column for even a single frame.
+    function lockScrollFrame() {
+      if (isSelecting && lockedScrollLeft !== null && document.scrollingElement) {
+        if (document.scrollingElement.scrollLeft !== lockedScrollLeft) {
+          document.scrollingElement.scrollLeft = lockedScrollLeft;
+        }
+      }
+      if (isSelecting) {
+        selectionRAF = requestAnimationFrame(lockScrollFrame);
+      } else {
+        selectionRAF = null;
+      }
+    }
+
+    // Also catch scroll events as backup.
+    document.addEventListener(
+      "scroll",
+      function () {
+        if (isSelecting && lockedScrollLeft !== null && document.scrollingElement) {
+          document.scrollingElement.scrollLeft = lockedScrollLeft;
+        }
+      },
+      { passive: false }
+    );
+
     document.addEventListener("selectionchange", function () {
-      const collapsed = window.getSelection().isCollapsed;
+      if (suppressSelectionChange) return;
+      var sel = window.getSelection();
+      var collapsed = sel.isCollapsed;
+      var focusType = sel.focusNode ? sel.focusNode.nodeType : -1;
+      var focusTag = sel.focusNode ? (sel.focusNode.nodeName || sel.focusNode.parentElement?.tagName || "?") : "null";
+      var textLen = collapsed ? 0 : sel.toString().length;
+      Android.log("[SEL] collapsed=" + collapsed + " textLen=" + textLen +
+        " focus=" + focusTag + "(type=" + focusType + ")" +
+        " lastValid=" + lastValidTextLen +
+        " scrollLeft=" + (document.scrollingElement ? document.scrollingElement.scrollLeft : -1));
+
+      // Detect and suppress column-crossing glitch: when dragging a selection
+      // handle across a CSS column boundary, Android WebView may momentarily
+      // snap the focus node to a container element (div/body), causing a huge
+      // text selection spike. When this happens, restore the last valid range.
+      if (isSelecting && !collapsed && sel.focusNode && sel.focusNode.nodeType !== Node.TEXT_NODE) {
+        var currentLen = sel.toString().length;
+        Android.log("[SEL] SPIKE detected: focusType=" + focusType + " currentLen=" + currentLen + " lastValid=" + lastValidTextLen);
+        // A genuine user drag grows gradually; a spike jumps by hundreds of chars.
+        if (lastValidRange && currentLen > lastValidTextLen * 3 && currentLen - lastValidTextLen > 200) {
+          Android.log("[SEL] RESTORING last valid range (len=" + lastValidTextLen + ")");
+          try {
+            suppressSelectionChange = true;
+            window.__suppressRNSelectionEvents = true;
+            sel.removeAllRanges();
+            sel.addRange(lastValidRange.cloneRange());
+          } catch (e) {
+            Android.log("[SEL] RESTORE FAILED: " + e);
+          } finally {
+            // Use setTimeout to release suppression after the synchronous
+            // selectionchange events triggered by removeAllRanges/addRange.
+            setTimeout(function () {
+              suppressSelectionChange = false;
+              window.__suppressRNSelectionEvents = false;
+            }, 0);
+          }
+          return; // Skip further processing — we restored the old selection.
+        }
+      }
+
+      // Save the current range as "last valid" when the focus is on a text node.
+      if (!collapsed && sel.rangeCount > 0 && sel.focusNode && sel.focusNode.nodeType === Node.TEXT_NODE) {
+        try {
+          lastValidRange = sel.getRangeAt(0).cloneRange();
+          lastValidTextLen = sel.toString().length;
+        } catch (e) { /* ignore */ }
+      }
+
+      // Reset scrollLeft immediately at the top of every selectionchange event.
+      if (isSelecting && lockedScrollLeft !== null && document.scrollingElement) {
+        document.scrollingElement.scrollLeft = lockedScrollLeft;
+      }
 
       if (collapsed && isSelecting) {
         isSelecting = false;
+        lockedScrollLeft = null;
+        lastValidRange = null;
+        lastValidTextLen = 0;
+        if (selectionRAF) { cancelAnimationFrame(selectionRAF); selectionRAF = null; }
         Android.onSelectionEnd();
-        // Snaps the current column in case the user shifted the scroll by dragging the text selection.
-        snapCurrentOffset();
+        // Debounce snap to avoid disrupting selection handle adjustment if the
+        // collapse was spurious (selection re-expands within 300ms).
+        if (snapTimeout) clearTimeout(snapTimeout);
+        snapTimeout = setTimeout(function () {
+          snapCurrentOffset();
+          snapTimeout = null;
+        }, 300);
       } else if (!collapsed && !isSelecting) {
         isSelecting = true;
+        // Lock horizontal scroll position at the moment selection starts
+        // and begin rAF loop to enforce it every frame.
+        if (document.scrollingElement) {
+          lockedScrollLeft = document.scrollingElement.scrollLeft;
+        }
+        if (!selectionRAF) {
+          selectionRAF = requestAnimationFrame(lockScrollFrame);
+        }
         Android.onSelectionStart();
+        // Cancel pending snap — user resumed selecting before the debounce fired.
+        if (snapTimeout) {
+          clearTimeout(snapTimeout);
+          snapTimeout = null;
+        }
       }
     });
   },

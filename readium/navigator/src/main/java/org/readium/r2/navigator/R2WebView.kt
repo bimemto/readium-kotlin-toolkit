@@ -14,6 +14,7 @@ package org.readium.r2.navigator
 import android.content.Context
 import android.graphics.Rect
 import android.os.Build
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.FocusFinder
 import android.view.Gravity
@@ -756,6 +757,10 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
      * early to prevent even the slightest visual movement.
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // Never intercept touches during active text selection — let the WebView handle
+        // selection handle drags without interference from swipe/drag cancellation.
+        if (isSelecting) return super.dispatchTouchEvent(ev)
+
         if (!scrollMode && !swipeEnabled) {
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -822,7 +827,11 @@ internal class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView
                     return false
                 }
 
-                if (!isSelecting && !mIsBeingDragged) {
+                // Guard: don't start drag detection if the user was recently selecting text.
+                // The JS selectionchange event can spuriously set isSelecting=false during
+                // handle drag; the cooldown prevents us from entering drag mode in that window.
+                val recentlySelecting = (SystemClock.uptimeMillis() - lastSelectionActiveTime) < 300
+                if (!isSelecting && !recentlySelecting && !mIsBeingDragged) {
                     mInitialVelocity = getCurrentXVelocity()
                     val pointerIndex = ev.findPointerIndex(mActivePointerId)
                     val x = ev.safeGetX(pointerIndex)
