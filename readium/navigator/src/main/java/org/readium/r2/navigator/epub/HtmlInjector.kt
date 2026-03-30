@@ -58,6 +58,9 @@ internal fun Resource.injectHtml(
                     baseHref.resolve(Url("readium/scripts/readium-reflowable.js")!!)
                 )
             )
+            // GOG: apply symmetric body padding during HTML parse (before first paint) to avoid
+            // layout jump from late WebView.evaluateJavascript on Android.
+            injectables.add(gogReaderSymmetricBodyPaddingScript())
         }
 
         // Disable the text selection if the publication is protected.
@@ -89,3 +92,64 @@ internal fun Resource.injectHtml(
 
 private fun script(src: Url): String =
     """<script type="text/javascript" src="$src"></script>"""
+
+/**
+ * Inline script: add [GOG_READER_BODY_SYMMETRIC_EXTRA_CSS_PX] to body padding-left/right from the
+ * first computed values, re-apply on DOM mutations (Readium may set margins after load).
+ * Must stay in sync with iOS EPUBViewController `noteIconSymmetricInsetCssPx`.
+ */
+private const val GOG_READER_BODY_SYMMETRIC_EXTRA_CSS_PX: Int = 4
+
+@Suppress("MaxLineLength")
+private fun gogReaderSymmetricBodyPaddingScript(): String =
+    """
+    <script>
+    (function(){
+      try {
+        var EXTRA = ${GOG_READER_BODY_SYMMETRIC_EXTRA_CSS_PX};
+        function disconnectOld() {
+          if (window.__gogNoteIconPaddingMO) {
+            window.__gogNoteIconPaddingMO.disconnect();
+            window.__gogNoteIconPaddingMO = null;
+          }
+        }
+        function ensureOrig() {
+          var b = document.body;
+          if (!b) return false;
+          if (!b.dataset.gogOrigPadL) {
+            var cs = window.getComputedStyle(b);
+            b.dataset.gogOrigPadL = cs.paddingLeft || '0px';
+            b.dataset.gogOrigPadR = cs.paddingRight || '0px';
+          }
+          return true;
+        }
+        function px(v) {
+          var n = parseFloat(v || '0');
+          return isNaN(n) ? 0 : n;
+        }
+        function update() {
+          var b = document.body;
+          if (!b) return;
+          if (!ensureOrig()) return;
+          var origL = b.dataset.gogOrigPadL || '0px';
+          var origR = b.dataset.gogOrigPadR || '0px';
+          b.style.setProperty('padding-left', (px(origL) + EXTRA) + 'px', 'important');
+          b.style.setProperty('padding-right', (px(origR) + EXTRA) + 'px', 'important');
+        }
+        function start() {
+          disconnectOld();
+          update();
+          window.__gogNoteIconPaddingMO = new MutationObserver(function(){ update(); });
+          window.__gogNoteIconPaddingMO.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+          window.addEventListener('load', function(){ update(); }, { once: true });
+          requestAnimationFrame(function(){ update(); });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', start, { once: true });
+        } else {
+          start();
+        }
+      } catch (e) {}
+    })();
+    </script>
+    """.trimIndent()
