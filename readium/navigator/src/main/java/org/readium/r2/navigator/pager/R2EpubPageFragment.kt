@@ -28,7 +28,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.webkit.WebViewClientCompat
+import android.webkit.WebResourceError
+import android.webkit.WebViewClient
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlin.coroutines.resume
@@ -230,7 +231,7 @@ internal class R2EpubPageFragment : Fragment() {
             }
         })
 
-        webView.webViewClient = object : WebViewClientCompat() {
+        webView.webViewClient = object : WebViewClient() {
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
                 (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request) ?: false
@@ -251,6 +252,28 @@ internal class R2EpubPageFragment : Fragment() {
 
                 webView.onContentReady {
                     onLoadPage()
+                }
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) {
+                    val html = """
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+                        </head>
+                        <body style="
+                            display:flex;align-items:center;justify-content:center;
+                            height:100vh;margin:0;
+                            color:#3B2119;background:transparent;text-align:center;
+                        ">
+                            <div>
+                                <p style="font-size:48px;margin:0;">📖</p>
+                                <p style="font-size:1em;font-family:'Aleo',serif;">This page content is not available</p>
+                            </div>
+                        </body></html>
+                    """.trimIndent()
+                    view.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
                 }
             }
 
