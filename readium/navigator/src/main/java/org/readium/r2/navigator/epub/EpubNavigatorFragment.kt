@@ -1347,6 +1347,18 @@ public class EpubNavigatorFragment internal constructor(
                 }
             } ?: ""
 
+            // Extract visible text at viewport top for cross-device sync precision
+            val visibleText = reflowableWebView?.let { wv ->
+                kotlinx.coroutines.suspendCancellableCoroutine<String?> { cont ->
+                    wv.evaluateJavascript(
+                        "(function(){ var loc = readium.findFirstVisibleLocator(); return loc && loc.text ? loc.text.highlight || '' : ''; })()"
+                    ) { result ->
+                        val cleaned = result?.trim()?.removeSurrounding("\"") ?: ""
+                        cont.resumeWith(Result.success(cleaned.ifEmpty { null }))
+                    }
+                }
+            }
+
             // Build href with fragment if a TOC sub-section is visible
             val locatorHref = if (tocFragment.isNotEmpty()) {
                 val baseUrl = link.url().toString()
@@ -1377,7 +1389,11 @@ public class EpubNavigatorFragment internal constructor(
                     progression = progression,
                     otherLocations = otherWithPageCount
                 ),
-                text = positionLocator?.text ?: Locator.Text()
+                text = if (!visibleText.isNullOrEmpty()) {
+                    Locator.Text(highlight = visibleText)
+                } else {
+                    positionLocator?.text ?: Locator.Text()
+                }
             )
 
             Log.d("EpubNavigator", "::notifyCurrentLocation CREATED LOCATOR: href=${currentLocator.href}, title=${currentLocator.title}, progression=${currentLocator.locations.progression}, totalProgression=${currentLocator.locations.totalProgression}")
