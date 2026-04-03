@@ -261,6 +261,18 @@ internal class R2EpubPageFragment : Fragment() {
                         <html>
                         <head>
                             <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+                            <script>
+                            document.addEventListener('click', function(e) {
+                                var r = window.devicePixelRatio || 1;
+                                Android.onTap(JSON.stringify({
+                                    defaultPrevented: false,
+                                    x: e.clientX * r,
+                                    y: e.clientY * r,
+                                    targetElement: e.target.outerHTML,
+                                    interactiveElement: null
+                                }));
+                            });
+                            </script>
                         </head>
                         <body style="
                             display:flex;align-items:center;justify-content:center;
