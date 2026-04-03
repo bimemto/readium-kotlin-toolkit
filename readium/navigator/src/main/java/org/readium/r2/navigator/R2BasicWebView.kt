@@ -206,37 +206,6 @@ internal open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebV
         }
     }
 
-    /**
-     * Computes the progression at the end edge of the currently visible viewport.
-     * In scroll mode this is based on scroll offset + viewport extent.
-     * In paginated mode, this falls back to [progression].
-     */
-    val pageEndProgression: Double
-        get() {
-            if (!scrollMode) return progression
-
-            return if (listener?.verticalText == true) {
-                val x = scrollX.toDouble()
-                val contentWidth = computeHorizontalScrollRange().toDouble()
-                val viewportWidth = computeHorizontalScrollExtent().toDouble()
-                val maxScrollX = (contentWidth - viewportWidth).coerceAtLeast(0.0)
-                if (maxScrollX <= 0.0 || contentWidth <= 0.0) {
-                    progression
-                } else {
-                    ((maxScrollX - x + viewportWidth) / contentWidth).coerceIn(0.0, 1.0)
-                }
-            } else {
-                val y = scrollY.toDouble()
-                val contentHeight = computeVerticalScrollRange().toDouble()
-                val viewportHeight = computeVerticalScrollExtent().toDouble()
-                if (contentHeight <= 0.0) {
-                    progression
-                } else {
-                    ((y + viewportHeight) / contentHeight).coerceIn(0.0, 1.0)
-                }
-            }
-        }
-
     interface OnOverScrolledCallback {
         fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean)
     }
