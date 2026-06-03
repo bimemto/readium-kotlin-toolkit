@@ -1062,6 +1062,40 @@ public class EpubNavigatorFragment internal constructor(
         return true
     }
 
+    /**
+     * Returns whether a forward/backward page turn can move to another page or
+     * resource. This does not mutate navigator state.
+     */
+    public fun canNavigate(forward: Boolean): Boolean {
+        if (!::resourcePager.isInitialized) return false
+
+        val adapter = resourcePager.adapter ?: return false
+        if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
+            return if (forward) {
+                resourcePager.currentItem < adapter.count - 1
+            } else {
+                resourcePager.currentItem > 0
+            }
+        }
+
+        val webView = currentReflowablePageFragment?.webView ?: return false
+        val canScrollWithinResource = when (settings.value.readingProgression) {
+            ReadingProgression.LTR ->
+                webView.canScrollHorizontally(if (forward) 1 else -1)
+
+            ReadingProgression.RTL ->
+                webView.canScrollHorizontally(if (forward) -1 else 1)
+        }
+
+        if (canScrollWithinResource) return true
+
+        return if (forward) {
+            resourcePager.currentItem < adapter.count - 1
+        } else {
+            resourcePager.currentItem > 0
+        }
+    }
+
     private fun goToNextResource(jump: Boolean, animated: Boolean): Boolean {
         val adapter = resourcePager.adapter ?: return false
         if (resourcePager.currentItem >= adapter.count - 1) {
