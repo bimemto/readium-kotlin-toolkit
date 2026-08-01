@@ -1195,7 +1195,8 @@ public class EpubNavigatorFragment internal constructor(
     override val currentLocator: StateFlow<Locator> get() = _currentLocator
     private val _currentLocator = MutableStateFlow(
         initialLocator
-            ?: requireNotNull(publication.locatorFromLink(this.readingOrder.first()))
+            ?: this.readingOrder.firstOrNull()?.let { publication.locatorFromLink(it) }
+            ?: error("Cannot open publication with empty reading order")
     )
 
     /**
