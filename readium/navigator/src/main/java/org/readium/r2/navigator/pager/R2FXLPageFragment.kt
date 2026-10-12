@@ -77,7 +77,8 @@ internal class R2FXLPageFragment : Fragment() {
             view.setPadding(0, 0, 0, 0)
 
             val r2FXLLayout = doubleBinding.r2FXLLayout
-            r2FXLLayout.isAllowParentInterceptOnScaled = true
+            // GOG: zoomed pans stay inside the page; zoom out to turn page (comic reader).
+            r2FXLLayout.isAllowParentInterceptOnScaled = false
 
             val left = doubleBinding.firstWebView
             val right = doubleBinding.secondWebView
@@ -103,7 +104,8 @@ internal class R2FXLPageFragment : Fragment() {
             view.setPadding(0, 0, 0, 0)
 
             val r2FXLLayout = singleBinding.r2FXLLayout
-            r2FXLLayout.isAllowParentInterceptOnScaled = true
+            // GOG: zoomed pans stay inside the page; zoom out to turn page (comic reader).
+            r2FXLLayout.isAllowParentInterceptOnScaled = false
 
             val webview = singleBinding.webViewSingle
 

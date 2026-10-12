@@ -29,11 +29,22 @@ import android.view.animation.Interpolator
 import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import org.readium.r2.shared.InternalReadiumApi
 import org.readium.r2.shared.extensions.equalsDelta
+
+/** GOG: lets the app (outside this module) ask whether an FXL page is zoomed. */
+public fun isZoomedFixedLayoutView(view: android.view.View): Boolean =
+    (view as? R2FXLLayout)?.isScaled == true
+
+/**
+ * GOG: a zoomed FXL page was flung past the image edge it was already at. The page has
+ * been zoomed back to fit; the app turns the page (forward = towards the next page).
+ */
+public var onZoomedFixedLayoutEdgeSwipe: ((forward: Boolean) -> Unit)? = null
 
 internal class R2FXLLayout : FrameLayout {
 
@@ -271,6 +282,11 @@ internal class R2FXLLayout : FrameLayout {
 
         val action = ev.action and MotionEvent.ACTION_MASK
         dispatchOnTouch(action, ev)
+        // GOG: a 2nd finger means pinch — re-lock the ViewPager in case the 1st finger's
+        // early move at scale 1 already released it in onScroll.
+        if (action == MotionEvent.ACTION_POINTER_DOWN) {
+            requestDisallowInterceptTouchEvent(true)
+        }
 
         var consumed = scaleDetector!!.onTouchEvent(ev)
         consumed = gestureDetector!!.onTouchEvent(ev) || consumed
@@ -285,6 +301,11 @@ internal class R2FXLLayout : FrameLayout {
 
         private var mScaleOnActionDown: Float = 0.toFloat()
         private var mScrolling = false
+
+        // GOG: zoomed at gesture start, and which horizontal image edges were showing.
+        private var edgeSwipeArmed = false
+        private var edgeAtLeft = false
+        private var edgeAtRight = false
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
             return false
@@ -332,6 +353,13 @@ internal class R2FXLLayout : FrameLayout {
         }
 
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            if (isZoomedEdgeSwipe(e1, e2, velocityX)) {
+                val forward = e2.x < e1!!.x
+                setScale(1f, false)
+                // Let the page redraw at fit before a curl snapshots it.
+                postDelayed({ onZoomedFixedLayoutEdgeSwipe?.invoke(forward) }, EDGE_TURN_DELAY_MS)
+                return true
+            }
             val scale = scale
             val newScale = scale.coerceIn(minScale, maxScale)
             if (newScale.equalsDelta(scale)) {
@@ -347,7 +375,23 @@ internal class R2FXLLayout : FrameLayout {
         override fun onShowPress(e: MotionEvent) {
         }
 
+        /** Same thresholds as the iOS slide swipe, in dp. */
+        private fun isZoomedEdgeSwipe(e1: MotionEvent?, e2: MotionEvent, velocityX: Float): Boolean {
+            if (!edgeSwipeArmed || e1 == null || e2.pointerCount != 1) return false
+            val d = resources.displayMetrics.density
+            val dx = e2.x - e1.x
+            val dy = e2.y - e1.y
+            if (abs(dx) <= abs(dy) * 1.5f || abs(dx) <= 50 * d || abs(velocityX) <= 300 * d) return false
+            return if (dx < 0) edgeAtRight else edgeAtLeft
+        }
+
         override fun onDown(e: MotionEvent): Boolean {
+            edgeSwipeArmed = isScaled && onZoomedFixedLayoutEdgeSwipe != null
+            if (edgeSwipeArmed) {
+                val bounds = translateDeltaBounds
+                edgeAtLeft = bounds.left >= -EDGE_SLOP
+                edgeAtRight = bounds.right <= EDGE_SLOP
+            }
             mScaleOnActionDown = scale
             requestDisallowInterceptTouchEvent(true)
             cancelFling()
@@ -982,6 +1026,10 @@ internal class R2FXLLayout : FrameLayout {
     companion object {
 
         private const val DEF_ZOOM_DURATION = 250
+
+        // GOG: zoomed edge swipe (see onZoomedFixedLayoutEdgeSwipe).
+        private const val EDGE_SLOP = 2f
+        private const val EDGE_TURN_DELAY_MS = 100L
 
         fun removeGlobal(v: View, listener: ViewTreeObserver.OnGlobalLayoutListener?) {
             val obs = v.viewTreeObserver
