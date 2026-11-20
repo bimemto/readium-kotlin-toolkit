@@ -29,17 +29,21 @@ internal class PresentationAdapter(
             .adapt { it.takeFirstWithProperty(Vocabularies.RENDITION + "orientation") }
             ?.value
 
-        val layoutProp =
-            if (epubVersion < 3.0) {
-                if (displayOptions["fixed-layout"] == "true") {
-                    "pre-paginated"
-                } else {
-                    "reflowable"
-                }
+        // GOG: whatever the package version says. Fixed-layout books in the wild carry an
+        // EPUB 3 `rendition:layout` in a "2.0" / "3.0.1" package, an EPUB 3 package with only
+        // the iBooks/Kobo display option, or just the Kindle `fixed-layout` meta (kindlegen,
+        // Kindle Comic Converter). Same precedence as the Swift toolkit.
+        val renditionLayout = itemsHolder
+            .adapt { it.takeFirstWithProperty(Vocabularies.RENDITION + "layout") }
+            ?.value
+        val kindleFixedLayout = itemsHolder
+            .adapt { it.takeFirstWithProperty("fixed-layout") }
+            ?.value
+        val layoutProp = renditionLayout
+            ?: if (displayOptions["fixed-layout"] == "true" || kindleFixedLayout == "true") {
+                "pre-paginated"
             } else {
-                itemsHolder
-                    .adapt { it.takeFirstWithProperty(Vocabularies.RENDITION + "layout") }
-                    ?.value
+                "reflowable"
             }
 
         val (overflow, continuous) = when (flowProp) {
